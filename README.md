@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 🏗️ Architecture
 
-Synapse consists of several key components:
+SomaSync consists of several key components:
 
 ### Core Components
 
@@ -91,7 +91,7 @@ The architecture is inspired by neural networks:
 ### Basic Mesh Network
 
 ```rust
-use synapse::{SynapseNodeBuilder, Peer};
+use somasync::{SynapseNodeBuilder, Peer};
 
 // Create two nodes
 let (mut node1, _, _) = SynapseNodeBuilder::new()
@@ -111,9 +111,9 @@ node1.add_peer(peer_beta).await?;
 ### Message Broadcasting
 
 ```rust
-use synapse::{MessageType, priority, ttl};
+use somasync::MessageType;
 
-// Send high-priority message with custom TTL
+// Send high-priority message
 node.broadcast_message(
     MessageType::Alert {
         level: "critical".to_string(),
@@ -133,6 +133,8 @@ node.broadcast_message(MessageType::Structured(data)).await?;
 ### Event Handling
 
 ```rust
+use somasync::SynapseEvent;
+
 // Handle incoming messages and events
 tokio::spawn(async move {
     while let Some(message) = message_rx.recv().await {
@@ -157,10 +159,10 @@ tokio::spawn(async move {
 
 ## 🔧 Configuration
 
-Synapse supports extensive configuration:
+SomaSync supports extensive configuration:
 
 ```rust
-use synapse::{SynapseNodeBuilder, GossipConfig, MeshConfig, DiscoveryConfig};
+use somasync::{SynapseNodeBuilder, GossipConfig};
 use std::time::Duration;
 
 let gossip_config = GossipConfig {
@@ -170,16 +172,9 @@ let gossip_config = GossipConfig {
     ..Default::default()
 };
 
-let mesh_config = MeshConfig {
-    max_connections: 20,
-    route_timeout: Duration::from_secs(10),
-    ..Default::default()
-};
-
 let (node, _, _) = SynapseNodeBuilder::new()
     .with_node_id("configured-node".to_string())
     .with_gossip_config(gossip_config)
-    .with_mesh_config(mesh_config)
     .with_auto_discovery(true)
     .build();
 ```
@@ -194,7 +189,6 @@ println!("Node: {}", stats.node_id);
 println!("Uptime: {}s", stats.uptime);
 println!("Messages processed: {}", stats.messages_processed);
 println!("Healthy peers: {}", stats.peer_stats.healthy_peers);
-println!("Routes cached: {}", stats.mesh_stats.routes_cached);
 ```
 
 ## 🧪 Testing
@@ -226,7 +220,7 @@ at your option.
 
 ## 🔬 Research & Inspiration
 
-Synapse draws inspiration from:
+SomaSync draws inspiration from:
 
 - Neural network architectures and synaptic communication
 - Gossip protocols and epidemic algorithms  
