@@ -1,16 +1,13 @@
 //! Basic example showing how to use the Synapse library
 
-use std::net::SocketAddr;
-use somasync::{SynapseNodeBuilder, MessageType, Peer};
+use somasync::{Peer, SynapseNodeBuilder};
 use tokio::time::{sleep, Duration};
 use tracing::{info, Level};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("Starting Synapse example");
 
