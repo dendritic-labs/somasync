@@ -16,7 +16,7 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use synapse::{SynapseNodeBuilder, MessageType};
+//! use somasync::{SynapseNodeBuilder, MessageType};
 //! use tokio;
 //!
 //! #[tokio::main]
