@@ -1,12 +1,9 @@
 # SomaSync 🧠
 
-[![CraAdd this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-somasync = "0.1"o](https://img.shields.io/crates/v/somasync)](https://crates.io/crates/somasync)
+[![Crates.io](https://img.shields.io/crates/v/somasync)](https://crates.io/crates/somasync)
 [![Documentation](https://docs.rs/somasync/badge.svg)](https://docs.rs/somasync)
 [![License](https://img.shields.io/crates/l/somasync)](LICENSE)
+[![Build Status](https://github.com/dendritic-labs/somasync/workflows/CI/badge.svg)](https://github.com/dendritic-labs/somasync/actions)
 
 **Neural-Inspired Distributed Mesh Networking Library**
 
@@ -23,19 +20,18 @@ SomaSync is a high-performance, self-organizing mesh networking library that ena
 
 ## 🚀 Quick Start
 
-Add Synapse to your `Cargo.toml`:
+Add SomaSync to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-synapse = "0.1"
+somasync = "0.1"
 tokio = { version = "1.0", features = ["full"] }
 ```
 
 Create a simple mesh network:
 
 ```rust
-```rust
-use somasync::{SynapseNodeBuilder, SynapseEvent, MessageType};
+use somasync::{SynapseNodeBuilder, SynapseEvent, MessageType, Peer};
 use tokio::time::{sleep, Duration};
 
 #[tokio::main]
@@ -66,6 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+```
 ```
 
 ## 🏗️ Architecture
