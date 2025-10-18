@@ -19,11 +19,18 @@ pub enum MessageType {
     /// Binary data payload
     Binary(Vec<u8>),
     /// Command or control message
-    Command { action: String, params: HashMap<String, String> },
+    Command {
+        action: String,
+        params: HashMap<String, String>,
+    },
     /// Status or heartbeat message
     Status { component: String, state: String },
     /// Error or alert message
-    Alert { level: String, message: String, details: Option<HashMap<String, String>> },
+    Alert {
+        level: String,
+        message: String,
+        details: Option<HashMap<String, String>>,
+    },
 }
 
 /// Core message structure for network communication
@@ -55,63 +62,63 @@ impl Message {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         Self {
             id,
             message_type,
             source,
             timestamp,
-            ttl: 3600, // 1 hour default TTL
+            ttl: 3600,     // 1 hour default TTL
             priority: 128, // Medium priority
             correlation_id: None,
             headers: HashMap::new(),
         }
     }
-    
+
     /// Create a new message with custom TTL
     pub fn with_ttl(mut self, ttl_seconds: u64) -> Self {
         self.ttl = ttl_seconds;
         self
     }
-    
+
     /// Create a new message with priority
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority;
         self
     }
-    
+
     /// Create a new message with correlation ID
     pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
         self.correlation_id = Some(correlation_id);
         self
     }
-    
+
     /// Add a header to the message
     pub fn with_header(mut self, key: String, value: String) -> Self {
         self.headers.insert(key, value);
         self
     }
-    
+
     /// Check if message has expired
     pub fn is_expired(&self) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         now > self.timestamp + self.ttl
     }
-    
+
     /// Get message age in seconds
     pub fn age(&self) -> u64 {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         now.saturating_sub(self.timestamp)
     }
-    
+
     /// Get remaining TTL in seconds
     pub fn remaining_ttl(&self) -> u64 {
         if self.is_expired() {
@@ -124,13 +131,13 @@ impl Message {
             (self.timestamp + self.ttl).saturating_sub(now)
         }
     }
-    
+
     /// Generate a unique message ID based on content and source
     fn generate_id(message_type: &MessageType, source: &str) -> u64 {
         use std::collections::hash_map::DefaultHasher;
-        
+
         let mut hasher = DefaultHasher::new();
-        
+
         // Hash the message content
         match message_type {
             MessageType::Data(data) => data.hash(&mut hasher),
@@ -152,7 +159,11 @@ impl Message {
                 component.hash(&mut hasher);
                 state.hash(&mut hasher);
             }
-            MessageType::Alert { level, message, details } => {
+            MessageType::Alert {
+                level,
+                message,
+                details,
+            } => {
                 level.hash(&mut hasher);
                 message.hash(&mut hasher);
                 if let Some(details) = details {
@@ -163,7 +174,7 @@ impl Message {
                 }
             }
         }
-        
+
         // Hash the source and timestamp
         source.hash(&mut hasher);
         SystemTime::now()
@@ -171,46 +182,54 @@ impl Message {
             .unwrap()
             .as_nanos()
             .hash(&mut hasher);
-        
+
         // Add some randomness
         Uuid::new_v4().to_string().hash(&mut hasher);
-        
+
         hasher.finish()
     }
-    
+
     /// Create a response message correlated to this message
     pub fn create_response(&self, response_type: MessageType, source: String) -> Message {
-        let correlation_id = self.correlation_id.clone()
+        let correlation_id = self
+            .correlation_id
+            .clone()
             .unwrap_or_else(|| self.id.to_string());
-        
+
         Message::new(response_type, source)
             .with_correlation_id(correlation_id)
             .with_priority(self.priority)
     }
-    
+
     /// Get message size estimate in bytes
     pub fn estimated_size(&self) -> usize {
         let base_size = std::mem::size_of::<Message>();
         let type_size = match &self.message_type {
             MessageType::Data(data) => data.len(),
-            MessageType::Structured(map) => {
-                map.iter().map(|(k, v)| k.len() + v.len()).sum()
-            }
+            MessageType::Structured(map) => map.iter().map(|(k, v)| k.len() + v.len()).sum(),
             MessageType::Binary(data) => data.len(),
             MessageType::Command { action, params } => {
                 action.len() + params.iter().map(|(k, v)| k.len() + v.len()).sum::<usize>()
             }
             MessageType::Status { component, state } => component.len() + state.len(),
-            MessageType::Alert { level, message, details } => {
-                level.len() + message.len() + 
-                details.as_ref().map(|d| d.iter().map(|(k, v)| k.len() + v.len()).sum()).unwrap_or(0)
+            MessageType::Alert {
+                level,
+                message,
+                details,
+            } => {
+                level.len()
+                    + message.len()
+                    + details
+                        .as_ref()
+                        .map(|d| d.iter().map(|(k, v)| k.len() + v.len()).sum())
+                        .unwrap_or(0)
             }
         };
-        
+
         let headers_size: usize = self.headers.iter().map(|(k, v)| k.len() + v.len()).sum();
         let correlation_size = self.correlation_id.as_ref().map(|s| s.len()).unwrap_or(0);
         let source_size = self.source.len();
-        
+
         base_size + type_size + headers_size + correlation_size + source_size
     }
 }
@@ -244,42 +263,42 @@ impl MessageEnvelope {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         Self {
             message,
             message_id,
             source_node,
             timestamp,
             hop_count: 0,
-            max_hops: 10, // Default max hops
+            max_hops: 10,                            // Default max hops
             envelope_ttl: Duration::from_secs(3600), // 1 hour
             routing_hints: Vec::new(),
         }
     }
-    
+
     /// Create envelope with custom max hops
     pub fn with_max_hops(mut self, max_hops: u8) -> Self {
         self.max_hops = max_hops;
         self
     }
-    
+
     /// Create envelope with custom TTL
     pub fn with_ttl(mut self, ttl: Duration) -> Self {
         self.envelope_ttl = ttl;
         self
     }
-    
+
     /// Add routing hint
     pub fn with_routing_hint(mut self, hint: String) -> Self {
         self.routing_hints.push(hint);
         self
     }
-    
+
     /// Increment hop count
     pub fn increment_hop(&mut self) {
         self.hop_count += 1;
     }
-    
+
     /// Check if envelope has expired
     pub fn is_expired(&self) -> bool {
         let now = SystemTime::now()
@@ -287,15 +306,15 @@ impl MessageEnvelope {
             .unwrap()
             .as_secs();
         let created_secs = self.timestamp;
-        
+
         now.saturating_sub(created_secs) > self.envelope_ttl.as_secs()
     }
-    
+
     /// Check if hop count has been exceeded
     pub fn is_hop_exceeded(&self, max_hops: u8) -> bool {
         self.hop_count >= max_hops.min(self.max_hops)
     }
-    
+
     /// Get envelope age
     pub fn age(&self) -> Duration {
         let now = SystemTime::now()
@@ -303,14 +322,14 @@ impl MessageEnvelope {
             .unwrap()
             .as_secs();
         let created_secs = self.timestamp;
-        
+
         Duration::from_secs(now.saturating_sub(created_secs))
     }
-    
+
     /// Generate unique envelope ID
     fn generate_envelope_id(source_node: &str, _message: &crate::gossip::GossipMessage) -> u64 {
         use std::collections::hash_map::DefaultHasher;
-        
+
         let mut hasher = DefaultHasher::new();
         source_node.hash(&mut hasher);
         SystemTime::now()
@@ -319,10 +338,10 @@ impl MessageEnvelope {
             .as_nanos()
             .hash(&mut hasher);
         Uuid::new_v4().to_string().hash(&mut hasher);
-        
+
         hasher.finish()
     }
-    
+
     /// Check if envelope should be routed through specific nodes
     pub fn should_route_through(&self, node_id: &str) -> bool {
         if self.routing_hints.is_empty() {
@@ -331,13 +350,13 @@ impl MessageEnvelope {
             self.routing_hints.contains(&node_id.to_string())
         }
     }
-    
+
     /// Get estimated envelope size
     pub fn estimated_size(&self) -> usize {
         let base_size = std::mem::size_of::<MessageEnvelope>();
         let source_size = self.source_node.len();
         let hints_size: usize = self.routing_hints.iter().map(|h| h.len()).sum();
-        
+
         // Note: This doesn't include the actual message size as it would be recursive
         // The message size should be calculated separately
         base_size + source_size + hints_size
@@ -367,7 +386,7 @@ impl MessageBatch {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         Self {
             batch_id,
             messages,
@@ -376,36 +395,36 @@ impl MessageBatch {
             checksum: None,
         }
     }
-    
+
     /// Create batch with compression
     pub fn with_compression(mut self, compression: String) -> Self {
         self.compression = Some(compression);
         self
     }
-    
+
     /// Add checksum to batch
     pub fn with_checksum(mut self) -> Self {
         self.checksum = Some(self.calculate_checksum());
         self
     }
-    
+
     /// Calculate batch checksum
     fn calculate_checksum(&self) -> u64 {
         use std::collections::hash_map::DefaultHasher;
-        
+
         let mut hasher = DefaultHasher::new();
         self.batch_id.hash(&mut hasher);
         self.created_at.hash(&mut hasher);
-        
+
         for msg in &self.messages {
             msg.message_id.hash(&mut hasher);
             msg.source_node.hash(&mut hasher);
             msg.timestamp.hash(&mut hasher);
         }
-        
+
         hasher.finish()
     }
-    
+
     /// Verify batch integrity
     pub fn verify_checksum(&self) -> bool {
         if let Some(expected) = self.checksum {
@@ -414,41 +433,41 @@ impl MessageBatch {
             true // No checksum to verify
         }
     }
-    
+
     /// Get batch size
     pub fn len(&self) -> usize {
         self.messages.len()
     }
-    
+
     /// Check if batch is empty
     pub fn is_empty(&self) -> bool {
         self.messages.is_empty()
     }
-    
+
     /// Get total estimated size of batch
     pub fn estimated_size(&self) -> usize {
         let base_size = std::mem::size_of::<MessageBatch>();
         let batch_id_size = self.batch_id.len();
         let messages_size: usize = self.messages.iter().map(|m| m.estimated_size()).sum();
         let compression_size = self.compression.as_ref().map(|c| c.len()).unwrap_or(0);
-        
+
         base_size + batch_id_size + messages_size + compression_size
     }
-    
+
     /// Split batch into smaller batches
     pub fn split(self, max_size: usize) -> Vec<MessageBatch> {
         if self.messages.len() <= max_size {
             return vec![self];
         }
-        
+
         let mut batches = Vec::new();
         let chunks: Vec<_> = self.messages.chunks(max_size).collect();
-        
+
         for chunk in chunks {
             let batch = MessageBatch::new(chunk.to_vec());
             batches.push(batch);
         }
-        
+
         batches
     }
 }
@@ -464,82 +483,68 @@ pub mod priority {
 
 /// Common TTL values for convenience
 pub mod ttl {
-    pub const IMMEDIATE: u64 = 60;      // 1 minute
-    pub const SHORT: u64 = 300;        // 5 minutes
-    pub const MEDIUM: u64 = 3600;      // 1 hour
-    pub const LONG: u64 = 86400;       // 24 hours
+    pub const IMMEDIATE: u64 = 60; // 1 minute
+    pub const SHORT: u64 = 300; // 5 minutes
+    pub const MEDIUM: u64 = 3600; // 1 hour
+    pub const LONG: u64 = 86400; // 24 hours
     pub const PERSISTENT: u64 = 604800; // 1 week
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_message_creation() {
         let msg = Message::new(
             MessageType::Data("test data".to_string()),
             "node1".to_string(),
         );
-        
+
         assert_eq!(msg.source, "node1");
         assert!(!msg.is_expired());
         assert_eq!(msg.priority, 128);
     }
-    
+
     #[test]
     fn test_message_with_ttl() {
-        let msg = Message::new(
-            MessageType::Data("test".to_string()),
-            "node1".to_string(),
-        ).with_ttl(60);
-        
+        let msg =
+            Message::new(MessageType::Data("test".to_string()), "node1".to_string()).with_ttl(60);
+
         assert_eq!(msg.ttl, 60);
         assert!(msg.remaining_ttl() <= 60);
     }
-    
+
     #[test]
     fn test_message_envelope() {
         use crate::gossip::GossipMessage;
-        
-        let msg = Message::new(
-            MessageType::Data("test".to_string()),
-            "node1".to_string(),
-        );
-        
-        let envelope = MessageEnvelope::new(
-            "node1".to_string(),
-            GossipMessage::Data(msg),
-        );
-        
+
+        let msg = Message::new(MessageType::Data("test".to_string()), "node1".to_string());
+
+        let envelope = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg));
+
         assert_eq!(envelope.source_node, "node1");
         assert_eq!(envelope.hop_count, 0);
         assert!(!envelope.is_expired());
     }
-    
+
     #[test]
     fn test_message_batch() {
         use crate::gossip::GossipMessage;
-        
-        let msg1 = Message::new(
-            MessageType::Data("test1".to_string()),
-            "node1".to_string(),
-        );
-        
-        let msg2 = Message::new(
-            MessageType::Data("test2".to_string()),
-            "node1".to_string(),
-        );
-        
+
+        let msg1 = Message::new(MessageType::Data("test1".to_string()), "node1".to_string());
+
+        let msg2 = Message::new(MessageType::Data("test2".to_string()), "node1".to_string());
+
         let env1 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg1));
         let env2 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg2));
-        
+
         let batch = MessageBatch::new(vec![env1, env2]).with_checksum();
-        
+
         assert_eq!(batch.len(), 2);
         assert!(batch.verify_checksum());
     }
-    
+
     #[test]
     fn test_message_response() {
         let original = Message::new(
@@ -548,8 +553,9 @@ mod tests {
                 params: HashMap::new(),
             },
             "node1".to_string(),
-        ).with_correlation_id("test-correlation".to_string());
-        
+        )
+        .with_correlation_id("test-correlation".to_string());
+
         let response = original.create_response(
             MessageType::Status {
                 component: "pong".to_string(),
@@ -557,18 +563,21 @@ mod tests {
             },
             "node2".to_string(),
         );
-        
-        assert_eq!(response.correlation_id, Some("test-correlation".to_string()));
+
+        assert_eq!(
+            response.correlation_id,
+            Some("test-correlation".to_string())
+        );
         assert_eq!(response.priority, original.priority);
     }
-    
+
     #[test]
     fn test_priority_constants() {
         assert_eq!(priority::CRITICAL, 255);
         assert_eq!(priority::NORMAL, 128);
         assert_eq!(priority::BACKGROUND, 0);
     }
-    
+
     #[test]
     fn test_ttl_constants() {
         assert_eq!(ttl::IMMEDIATE, 60);

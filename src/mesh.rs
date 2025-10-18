@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::interval;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 use crate::error::SynapseError;
 use crate::message::Message;
@@ -80,7 +80,7 @@ impl Route {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         Self {
             destination,
             next_hop,
@@ -92,17 +92,17 @@ impl Route {
             alternatives: Vec::new(),
         }
     }
-    
+
     /// Check if route is expired
     pub fn is_expired(&self, ttl: Duration) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         now - self.created_at > ttl.as_secs()
     }
-    
+
     /// Update route usage
     pub fn mark_used(&mut self) {
         self.last_used = SystemTime::now()
@@ -110,12 +110,12 @@ impl Route {
             .unwrap()
             .as_secs();
     }
-    
+
     /// Decrease reliability on failure
     pub fn mark_failed(&mut self) {
         self.reliability = self.reliability.saturating_sub(10);
     }
-    
+
     /// Increase reliability on success
     pub fn mark_successful(&mut self) {
         self.reliability = (self.reliability + 2).min(100);
@@ -226,7 +226,7 @@ impl MeshNetwork {
         peer_manager: Arc<PeerManager>,
     ) -> (Self, mpsc::UnboundedReceiver<(String, MeshMessage)>) {
         let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
-        
+
         let topology = NetworkTopology {
             connections: HashMap::new(),
             node_info: HashMap::new(),
@@ -236,7 +236,7 @@ impl MeshNetwork {
                 .unwrap()
                 .as_secs(),
         };
-        
+
         let mesh = Self {
             node_id,
             config,
@@ -247,30 +247,30 @@ impl MeshNetwork {
             outbound_tx,
             health_sequence: Arc::new(RwLock::new(0)),
         };
-        
+
         (mesh, outbound_rx)
     }
-    
+
     /// Start the mesh network
     pub async fn start(&self) -> Result<(), SynapseError> {
         info!("Starting mesh network for node {}", self.node_id);
-        
+
         // Start various mesh tasks
         let topology_task = async { self.start_topology_updates().await };
         let health_task = async { self.start_health_checks().await };
         let route_cleanup_task = async { self.start_route_cleanup().await };
         let partition_detection_task = async { self.start_partition_detection().await };
-        
+
         tokio::try_join!(
             topology_task,
             health_task,
             route_cleanup_task,
             partition_detection_task
         )?;
-        
+
         Ok(())
     }
-    
+
     /// Route a message to a destination
     pub async fn route_message(&self, target: &str, message: Message) -> Result<(), SynapseError> {
         // Check if we have a direct connection
@@ -279,50 +279,59 @@ impl MeshNetwork {
             // Direct connection available
             return self.send_direct(target, message).await;
         }
-        
+
         // Look up route in routing table
         let route = {
             let routing_table = self.routing_table.read().await;
             routing_table.get(target).cloned()
         };
-        
+
         match route {
             Some(mut route) if !route.is_expired(self.config.route_cache_ttl) => {
                 // Use cached route
                 route.mark_used();
                 let next_hop = route.next_hop.clone();
-                
+
                 // Update route in table
                 {
                     let mut routing_table = self.routing_table.write().await;
                     routing_table.insert(target.to_string(), route);
                 }
-                
+
                 self.send_via_route(&next_hop, target, message).await
             }
             _ => {
                 // Need to discover route
                 self.discover_route(target).await?;
-                
+
                 // For now, return an error - in practice, we might queue the message
                 Err(SynapseError::network("Route discovery in progress", target))
             }
         }
     }
-    
+
     /// Handle incoming mesh message
-    pub async fn handle_mesh_message(&self, _from: &str, message: MeshMessage) -> Result<(), SynapseError> {
+    pub async fn handle_mesh_message(
+        &self,
+        _from: &str,
+        message: MeshMessage,
+    ) -> Result<(), SynapseError> {
         match message {
-            MeshMessage::RouteDiscovery { target, origin, mut trace, timestamp } => {
+            MeshMessage::RouteDiscovery {
+                target,
+                origin,
+                mut trace,
+                timestamp,
+            } => {
                 debug!("Received route discovery for {} from {}", target, origin);
-                
+
                 // Check for loops
                 if trace.contains(&self.node_id) {
                     return Ok(());
                 }
-                
+
                 trace.push(self.node_id.clone());
-                
+
                 if target == self.node_id {
                     // We are the target, send response
                     let response = MeshMessage::RouteResponse {
@@ -332,7 +341,7 @@ impl MeshNetwork {
                         cost: trace.len() as u32,
                         timestamp,
                     };
-                    
+
                     self.send_mesh_message(&origin, response).await?;
                 } else {
                     // Forward the discovery
@@ -342,14 +351,20 @@ impl MeshNetwork {
                         trace,
                         timestamp,
                     };
-                    
+
                     self.broadcast_to_neighbors(discovery).await?;
                 }
             }
-            
-            MeshMessage::RouteResponse { target, origin, route, cost, timestamp: _ } => {
+
+            MeshMessage::RouteResponse {
+                target,
+                origin,
+                route,
+                cost,
+                timestamp: _,
+            } => {
                 debug!("Received route response for {} from {}", target, origin);
-                
+
                 if origin == self.node_id && !route.is_empty() {
                     // This response is for us
                     if let Some(next_hop) = route.get(1) {
@@ -359,48 +374,80 @@ impl MeshNetwork {
                             route.len() as u8 - 1,
                             cost,
                         );
-                        
+
                         let mut routing_table = self.routing_table.write().await;
                         routing_table.insert(target.clone(), new_route);
-                        
+
                         // Remove from pending discoveries
                         let mut pending = self.pending_discoveries.write().await;
                         pending.remove(&target);
                     }
                 }
             }
-            
-            MeshMessage::TopologyUpdate { node_id, connections, node_info, version } => {
+
+            MeshMessage::TopologyUpdate {
+                node_id,
+                connections,
+                node_info,
+                version,
+            } => {
                 debug!("Received topology update from {}", node_id);
-                self.update_topology(node_id, connections, node_info, version).await?;
+                self.update_topology(node_id, connections, node_info, version)
+                    .await?;
             }
-            
-            MeshMessage::PartitionDetected { partition_id, affected_nodes, timestamp: _ } => {
-                warn!("Network partition detected: {} affecting {} nodes", 
-                     partition_id, affected_nodes.len());
+
+            MeshMessage::PartitionDetected {
+                partition_id,
+                affected_nodes,
+                timestamp: _,
+            } => {
+                warn!(
+                    "Network partition detected: {} affecting {} nodes",
+                    partition_id,
+                    affected_nodes.len()
+                );
                 self.handle_partition(affected_nodes).await?;
             }
-            
-            MeshMessage::HealthPing { node_id, timestamp, sequence } => {
+
+            MeshMessage::HealthPing {
+                node_id,
+                timestamp,
+                sequence,
+            } => {
                 debug!("Received health ping from {} (seq: {})", node_id, sequence);
-                
+
                 let pong = MeshMessage::HealthPong {
                     node_id: self.node_id.clone(),
-                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                    timestamp: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs(),
                     sequence,
                     original_timestamp: timestamp,
                 };
-                
+
                 self.send_mesh_message(&node_id, pong).await?;
             }
-            
-            MeshMessage::HealthPong { node_id, timestamp: _, sequence, original_timestamp } => {
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+
+            MeshMessage::HealthPong {
+                node_id,
+                timestamp: _,
+                sequence,
+                original_timestamp,
+            } => {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
                 let latency = now - original_timestamp;
-                
-                debug!("Received health pong from {} (seq: {}, latency: {}ms)", 
-                      node_id, sequence, latency * 1000);
-                
+
+                debug!(
+                    "Received health pong from {} (seq: {}, latency: {}ms)",
+                    node_id,
+                    sequence,
+                    latency * 1000
+                );
+
                 // Update peer metrics
                 if let Some(mut peer) = self.peer_manager.get_peer(&node_id).await {
                     peer.update_metrics(latency * 1000, 0); // Convert to ms
@@ -408,10 +455,10 @@ impl MeshNetwork {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Discover route to target
     async fn discover_route(&self, target: &str) -> Result<(), SynapseError> {
         // Check if discovery is already in progress
@@ -421,7 +468,7 @@ impl MeshNetwork {
                 return Ok(()); // Discovery already in progress
             }
         }
-        
+
         // Mark discovery as pending
         {
             let mut pending = self.pending_discoveries.write().await;
@@ -431,7 +478,7 @@ impl MeshNetwork {
                 .as_secs();
             pending.insert(target.to_string(), (self.node_id.clone(), now));
         }
-        
+
         // Send route discovery
         let discovery = MeshMessage::RouteDiscovery {
             target: target.to_string(),
@@ -442,58 +489,67 @@ impl MeshNetwork {
                 .unwrap()
                 .as_secs(),
         };
-        
+
         self.broadcast_to_neighbors(discovery).await?;
-        
+
         info!("Started route discovery for {}", target);
         Ok(())
     }
-    
+
     /// Send message directly to a peer
     async fn send_direct(&self, target: &str, _message: Message) -> Result<(), SynapseError> {
         debug!("Sending message directly to {}", target);
-        
+
         // Mark peer as seen
         self.peer_manager.mark_peer_seen(target).await?;
-        
+
         // In a real implementation, this would send the message
         // through the appropriate transport mechanism
-        
+
         Ok(())
     }
-    
+
     /// Send message via discovered route
-    async fn send_via_route(&self, next_hop: &str, _target: &str, _message: Message) -> Result<(), SynapseError> {
+    async fn send_via_route(
+        &self,
+        next_hop: &str,
+        _target: &str,
+        _message: Message,
+    ) -> Result<(), SynapseError> {
         debug!("Routing message to {} via {}", _target, next_hop);
-        
+
         // In a real implementation, this would forward the message
         // to the next hop with appropriate routing headers
-        
+
         Ok(())
     }
-    
+
     /// Send mesh protocol message
-    async fn send_mesh_message(&self, target: &str, message: MeshMessage) -> Result<(), SynapseError> {
+    async fn send_mesh_message(
+        &self,
+        target: &str,
+        message: MeshMessage,
+    ) -> Result<(), SynapseError> {
         if let Err(e) = self.outbound_tx.send((target.to_string(), message)) {
             error!("Failed to send mesh message to {}: {}", target, e);
             return Err(SynapseError::network("Failed to send mesh message", target));
         }
         Ok(())
     }
-    
+
     /// Broadcast message to all neighbors
     async fn broadcast_to_neighbors(&self, message: MeshMessage) -> Result<(), SynapseError> {
         let peers = self.peer_manager.get_healthy_peers().await;
-        
+
         for peer in peers {
             if let Err(e) = self.send_mesh_message(&peer.id, message.clone()).await {
                 warn!("Failed to broadcast to {}: {}", peer.id, e);
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Update network topology
     async fn update_topology(
         &self,
@@ -503,7 +559,7 @@ impl MeshNetwork {
         version: u64,
     ) -> Result<(), SynapseError> {
         let mut topology = self.topology.write().await;
-        
+
         // Only update if version is newer
         if version > topology.version {
             topology.connections.insert(node_id.clone(), connections);
@@ -513,13 +569,13 @@ impl MeshNetwork {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
-            
+
             debug!("Updated topology to version {}", version);
         }
-        
+
         Ok(())
     }
-    
+
     /// Handle network partition
     async fn handle_partition(&self, affected_nodes: HashSet<String>) -> Result<(), SynapseError> {
         // Remove affected nodes from routing table
@@ -529,67 +585,71 @@ impl MeshNetwork {
                 routing_table.remove(node);
             }
         }
-        
+
         // Mark affected peers as disconnected
         for node in affected_nodes {
-            if let Err(e) = self.peer_manager.update_peer_state(&node, PeerState::Disconnected).await {
+            if let Err(e) = self
+                .peer_manager
+                .update_peer_state(&node, PeerState::Disconnected)
+                .await
+            {
                 warn!("Failed to update peer state for {}: {}", node, e);
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Start topology update task
     async fn start_topology_updates(&self) -> Result<(), SynapseError> {
         let mut interval = interval(self.config.topology_update_interval);
-        
+
         loop {
             interval.tick().await;
-            
+
             let peers = self.peer_manager.get_healthy_peers().await;
             let connections: HashSet<String> = peers.iter().map(|p| p.id.clone()).collect();
-            
+
             let node_info = NodeInfo {
                 id: self.node_id.clone(),
                 address: "127.0.0.1:0".parse().unwrap(), // This should be our actual address
                 capabilities: HashSet::new(),
-                load: 50, // This should be calculated based on actual load
+                load: 50,  // This should be calculated based on actual load
                 uptime: 0, // This should be actual uptime
                 version: Some("1.0.0".to_string()),
             };
-            
+
             let topology_version = {
                 let topology = self.topology.read().await;
                 topology.version + 1
             };
-            
+
             let update = MeshMessage::TopologyUpdate {
                 node_id: self.node_id.clone(),
                 connections,
                 node_info,
                 version: topology_version,
             };
-            
+
             if let Err(e) = self.broadcast_to_neighbors(update).await {
                 warn!("Failed to broadcast topology update: {}", e);
             }
         }
     }
-    
+
     /// Start health check task
     async fn start_health_checks(&self) -> Result<(), SynapseError> {
         let mut interval = interval(self.config.health_check_interval);
-        
+
         loop {
             interval.tick().await;
-            
+
             let sequence = {
                 let mut seq = self.health_sequence.write().await;
                 *seq += 1;
                 *seq
             };
-            
+
             let ping = MeshMessage::HealthPing {
                 node_id: self.node_id.clone(),
                 timestamp: SystemTime::now()
@@ -598,60 +658,62 @@ impl MeshNetwork {
                     .as_secs(),
                 sequence,
             };
-            
+
             if let Err(e) = self.broadcast_to_neighbors(ping).await {
                 warn!("Failed to broadcast health ping: {}", e);
             }
         }
     }
-    
+
     /// Start route cleanup task
     async fn start_route_cleanup(&self) -> Result<(), SynapseError> {
         let mut interval = interval(Duration::from_secs(300)); // 5 minutes
-        
+
         loop {
             interval.tick().await;
-            
+
             let mut routing_table = self.routing_table.write().await;
             let expired_routes: Vec<String> = routing_table
                 .iter()
                 .filter(|(_, route)| route.is_expired(self.config.route_cache_ttl))
                 .map(|(dest, _)| dest.clone())
                 .collect();
-            
+
             for dest in expired_routes {
                 routing_table.remove(&dest);
                 debug!("Removed expired route to {}", dest);
             }
         }
     }
-    
+
     /// Start partition detection task
     async fn start_partition_detection(&self) -> Result<(), SynapseError> {
         let mut interval = interval(self.config.partition_threshold);
-        
+
         loop {
             interval.tick().await;
-            
+
             // Simple partition detection based on peer connectivity
             let healthy_peers = self.peer_manager.get_healthy_peers().await;
-            
+
             if healthy_peers.len() < self.config.min_connections {
-                warn!("Potential network partition detected: only {} healthy peers", 
-                     healthy_peers.len());
-                
+                warn!(
+                    "Potential network partition detected: only {} healthy peers",
+                    healthy_peers.len()
+                );
+
                 // In a more sophisticated implementation, this would
                 // analyze the network topology to detect actual partitions
             }
         }
     }
-    
+
     /// Get mesh network statistics
     pub async fn get_stats(&self) -> MeshStats {
         let routing_table = self.routing_table.read().await;
         let topology = self.topology.read().await;
         let peers = self.peer_manager.get_healthy_peers().await;
-        
+
         MeshStats {
             routes_cached: routing_table.len(),
             healthy_connections: peers.len(),
@@ -674,61 +736,46 @@ pub struct MeshStats {
 mod tests {
     use super::*;
     use crate::peer::{DiscoveryConfig, PeerManager};
-    use std::str::FromStr;
-    
+
     #[test]
     fn test_route_creation() {
-        let route = Route::new(
-            "dest".to_string(),
-            "next".to_string(),
-            3,
-            100,
-        );
-        
+        let route = Route::new("dest".to_string(), "next".to_string(), 3, 100);
+
         assert_eq!(route.destination, "dest");
         assert_eq!(route.next_hop, "next");
         assert_eq!(route.hop_count, 3);
         assert_eq!(route.cost, 100);
         assert_eq!(route.reliability, 100);
     }
-    
+
     #[test]
     fn test_route_reliability() {
-        let mut route = Route::new(
-            "dest".to_string(),
-            "next".to_string(),
-            1,
-            10,
-        );
-        
+        let mut route = Route::new("dest".to_string(), "next".to_string(), 1, 10);
+
         let initial_reliability = route.reliability;
-        
+
         route.mark_failed();
         let failed_reliability = route.reliability;
         assert!(failed_reliability < initial_reliability);
-        
+
         route.mark_successful();
         let success_reliability = route.reliability;
         assert!(success_reliability > failed_reliability);
     }
-    
+
     #[tokio::test]
     async fn test_mesh_creation() {
         let config = MeshConfig::default();
         let peer_config = DiscoveryConfig::default();
         let peer_manager = Arc::new(PeerManager::new("test".to_string(), peer_config));
-        
-        let (mesh, _rx) = MeshNetwork::new(
-            "test-node".to_string(),
-            config,
-            peer_manager,
-        );
-        
+
+        let (mesh, _rx) = MeshNetwork::new("test-node".to_string(), config, peer_manager);
+
         let stats = mesh.get_stats().await;
         assert_eq!(stats.routes_cached, 0);
         assert_eq!(stats.healthy_connections, 0);
     }
-    
+
     #[test]
     fn test_mesh_config() {
         let config = MeshConfig::default();

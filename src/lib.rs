@@ -45,11 +45,11 @@ pub mod peer;
 
 // Re-export main types for convenience
 pub use error::SynapseError;
-pub use gossip::{GossipProtocol, GossipConfig, GossipStats};
-pub use mesh::{MeshNetwork, MeshConfig, Route, NetworkTopology, MeshStats};
-pub use message::{Message, MessageType, MessageEnvelope, MessageBatch, priority, ttl};
-pub use node::{SynapseNode, SynapseNodeBuilder, SynapseConfig, SynapseEvent, SynapseStats};
-pub use peer::{Peer, PeerManager, PeerState, DiscoveryConfig, DiscoveryMethod, PeerStats};
+pub use gossip::{GossipConfig, GossipProtocol, GossipStats};
+pub use mesh::{MeshConfig, MeshNetwork, MeshStats, NetworkTopology, Route};
+pub use message::{priority, ttl, Message, MessageBatch, MessageEnvelope, MessageType};
+pub use node::{SynapseConfig, SynapseEvent, SynapseNode, SynapseNodeBuilder, SynapseStats};
+pub use peer::{DiscoveryConfig, DiscoveryMethod, Peer, PeerManager, PeerState, PeerStats};
 
 /// Result type alias for synapse operations
 pub type Result<T> = std::result::Result<T, SynapseError>;
