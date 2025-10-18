@@ -6,12 +6,12 @@
 //!
 //! ## Core Features
 //!
-//! - **🧠 Neural-Inspired Architecture**: Nodes communicate like neurons via synaptic connections
-//! - **🌐 Mesh Networking**: Self-organizing peer discovery and connection management
-//! - **💬 Gossip Protocols**: Efficient data propagation with anti-entropy guarantees
-//! - **🔄 Self-Healing**: Automatic failure detection and network recovery
-//! - **⚡ High Performance**: Zero-copy serialization and connection pooling
-//! - **🛡️ Production Ready**: Comprehensive error handling and monitoring
+//! - **Neural-Inspired Architecture**: Nodes communicate like neurons via synaptic connections
+//! - **Mesh Networking**: Self-organizing peer discovery and connection management
+//! - **Gossip Protocols**: Efficient data propagation with anti-entropy guarantees
+//! - **Self-Healing**: Automatic failure detection and network recovery
+//! - **High Performance**: Zero-copy serialization and connection pooling
+//! - **Production Ready**: Comprehensive error handling and monitoring
 //!
 //! ## Quick Start
 //!

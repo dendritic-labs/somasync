@@ -12,7 +12,7 @@ We provide security updates for the following versions:
 
 We take security seriously at SomaSync. If you discover a security vulnerability, please follow these steps:
 
-### 🔒 Private Disclosure
+### Private Disclosure
 
 **DO NOT** open a public issue for security vulnerabilities.
 
@@ -22,7 +22,7 @@ Instead, please report security issues privately by:
 2. **GitHub Security**: Use GitHub's private vulnerability reporting feature
 3. **Encrypted Communication**: PGP key available on request
 
-### 📝 What to Include
+### What to Include
 
 Please provide as much information as possible:
 
@@ -32,14 +32,14 @@ Please provide as much information as possible:
 - **Environment**: Rust version, OS, SomaSync version
 - **Patches**: Suggested fixes if you have them
 
-### ⏱️ Response Timeline
+### Response Timeline
 
 - **24 hours**: Initial acknowledgment
 - **72 hours**: Initial assessment and triage
 - **7 days**: Detailed response with timeline
 - **30 days**: Target for fix and disclosure (may vary based on complexity)
 
-### 🏆 Recognition
+### Recognition
 
 We believe in recognizing security researchers:
 
@@ -47,7 +47,7 @@ We believe in recognizing security researchers:
 - Listed in our security hall of fame
 - Swag and rewards for significant findings (when applicable)
 
-## 🛡️ Security Considerations
+## Security Considerations
 
 ### Network Security
 
@@ -72,14 +72,14 @@ SomaSync deals with network communication. Key considerations:
 - **Secrets Management**: Proper handling of cryptographic keys
 - **Resource Limits**: Preventing resource exhaustion attacks
 
-## 🔍 Security Audits
+## Security Audits
 
 - **Regular Reviews**: Code reviews with security focus
 - **Automated Scanning**: Dependency vulnerability scanning
 - **Third-party Audits**: Professional security audits for major releases
 - **Continuous Monitoring**: Ongoing security monitoring
 
-## 🚨 Security Advisories
+## Security Advisories
 
 Security advisories will be published:
 

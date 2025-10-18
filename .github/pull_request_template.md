@@ -1,4 +1,4 @@
-## 📝 Description
+## Description
 
 Brief description of changes made in this PR.
 
@@ -7,16 +7,16 @@ Brief description of changes made in this PR.
 Fixes #(issue_number)
 Relates to #(issue_number)
 
-## 🏷️ Type of Change
+## Type of Change
 
-- [ ] 🐛 Bug fix (non-breaking change that fixes an issue)
-- [ ] ✨ New feature (non-breaking change that adds functionality)
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
 - [ ] 💥 Breaking change (fix or feature that causes existing functionality to change)
 - [ ] 📚 Documentation update
-- [ ] 🔧 Maintenance/refactoring
-- [ ] ⚡ Performance improvement
+- [ ] Maintenance/refactoring
+- [ ] Performance improvement
 
-## 🧪 Testing
+## Testing
 
 - [ ] Unit tests pass (`cargo test`)
 - [ ] Integration tests pass
@@ -26,7 +26,7 @@ Relates to #(issue_number)
 **Test Coverage:**
 Describe what you tested and how.
 
-## 📋 Checklist
+## Checklist
 
 ### Code Quality
 - [ ] Code follows project style guidelines (`cargo fmt`)
@@ -50,7 +50,7 @@ Describe what you tested and how.
 - [ ] Memory usage considered
 - [ ] Benchmarks run (if applicable)
 
-## 🔄 Migration Guide
+## Migration Guide
 
 If this introduces breaking changes, provide a migration guide:
 
@@ -70,6 +70,6 @@ If applicable, add screenshots showing the changes.
 
 Any specific areas you'd like reviewers to focus on or questions you have.
 
-## 🚀 Deployment Notes
+## Deployment Notes
 
 Any special considerations for deployment or rollout.

@@ -1,0 +1,20 @@
+# Global ownership - all files require review from team
+* @dendritic-labs/core-team
+
+# Core library files require additional review
+/src/ @dendritic-labs/core-team @dendritic-labs/networking-team
+
+# Examples and documentation can be reviewed by broader team
+/examples/ @dendritic-labs/core-team @dendritic-labs/docs-team
+/README.md @dendritic-labs/core-team @dendritic-labs/docs-team
+/CHANGELOG.md @dendritic-labs/core-team @dendritic-labs/docs-team
+
+# Configuration and CI files require core team review
+/Cargo.toml @dendritic-labs/core-team
+/.github/ @dendritic-labs/core-team
+/Makefile @dendritic-labs/core-team
+
+# Security and governance files require strict review
+/SECURITY.md @dendritic-labs/core-team @dendritic-labs/security-team
+/CONTRIBUTING.md @dendritic-labs/core-team
+/.github/CODEOWNERS @dendritic-labs/core-team
