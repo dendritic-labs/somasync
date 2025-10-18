@@ -1,0 +1,39 @@
+[package]
+name = "somasync"
+version = "0.1.0"
+edition = "2021"
+description = "Neural-inspired distributed mesh networking and gossip protocols for edge networks"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dendritic-labs/somasync"
+homepage = "https://github.com/dendritic-labs/somasync"
+documentation = "https://docs.rs/somasync"
+authors = ["Dendritic Labs <team@dendriticlabs.com>"]
+readme = "README.md"
+keywords = ["mesh", "gossip", "networking", "distributed", "p2p"]
+categories = ["network-programming", "asynchronous"]
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+tracing = "0.1"
+rand = "0.8"
+twox-hash = "1.6"
+thiserror = "2.0"
+url = "2.0"
+futures = "0.3"
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.2"
+tracing-subscriber = "0.3"
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
+
+[lib]
+name = "somasync"
+path = "src/lib.rs"
