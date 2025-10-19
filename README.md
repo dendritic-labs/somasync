@@ -14,6 +14,8 @@ SomaSync is a high-performance, self-organizing mesh networking library that ena
 - **Neural-Inspired Architecture**: Nodes communicate like neurons via synaptic connections
 - **Self-Organizing Mesh**: Automatic peer discovery and topology optimization  
 - **Gossip Protocols**: Efficient data propagation with anti-entropy guarantees
+- **Message Signing**: Ed25519 cryptographic signatures for threat intel authenticity
+- **Enterprise Gossip**: Optimized protocols for 10K+ node networks with adaptive algorithms
 - **Self-Healing**: Automatic failure detection and network recovery
 - **High Performance**: Zero-copy serialization and connection pooling
 - **Production Ready**: Comprehensive error handling and monitoring
@@ -26,6 +28,9 @@ Add SomaSync to your `Cargo.toml`:
 [dependencies]
 somasync = "0.1"
 tokio = { version = "1.0", features = ["full"] }
+# For message signing (optional)
+ed25519-dalek = { version = "2.1", features = ["serde"] }
+rand = "0.8"
 ```
 
 Create a simple mesh network:
@@ -62,7 +67,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-```
 ```
 
 ## Architecture
@@ -149,7 +153,7 @@ tokio::spawn(async move {
                 println!("New peer connected: {} at {}", peer_id, address);
             }
             SynapseEvent::MessageReceived { from, message } => {
-                println!("Message from {}: {:?}", from, message);
+                println!("Message from {}: {:?}", from, *message);
             }
             _ => {}
         }
@@ -157,9 +161,70 @@ tokio::spawn(async move {
 });
 ```
 
+### Message Signing for Security
+
+```rust
+use somasync::{Message, MessageType};
+use ed25519_dalek::SigningKey;
+use rand::RngCore;
+
+// Generate a signing key for message authenticity
+let mut csprng = rand::rngs::OsRng;
+let mut secret_bytes = [0u8; 32];
+csprng.fill_bytes(&mut secret_bytes);
+let signing_key = SigningKey::from_bytes(&secret_bytes);
+
+// Create and sign a threat intelligence message
+let threat_message = Message::new(
+    MessageType::Alert {
+        level: "critical".to_string(),
+        message: "APT detected in network".to_string(),
+        details: Some(threat_details),
+    },
+    "threat-intel-node".to_string(),
+)
+.with_priority(255) // High priority
+.sign_with_ed25519(&signing_key); // Cryptographic signature
+
+// Recipients can verify message authenticity
+match threat_message.verify_signature() {
+    Ok(true) => println!("Message verified - authentic threat intel"),
+    Ok(false) => println!("Message signature invalid"),
+    Err(e) => println!("Verification failed: {}", e),
+}
+```
+
+### Enterprise Gossip for Scale
+
+```rust
+use somasync::{EnterpriseGossipConfig, GossipProtocol};
+
+// Configure enterprise gossip for 10K+ node networks
+let enterprise_config = EnterpriseGossipConfig::for_threat_intel()
+    .with_adaptive_fanout(20, 100)    // Scale fanout 20-100 based on network
+    .with_priority_routing()           // Route critical threats first
+    .with_smart_routing()              // Reputation-based peer selection
+    .with_bandwidth_limit(50_000_000); // 50MB/s bandwidth limit
+
+// Create enterprise gossip protocol
+let (gossip_protocol, outbound_rx) = GossipProtocol::new_enterprise(
+    "enterprise-node-001".to_string(),
+    enterprise_config,
+    message_tx,
+);
+
+// Enterprise protocols automatically:
+// - Adapt fanout based on network size and health
+// - Prioritize critical threat intelligence
+// - Manage bandwidth for enterprise networks
+// - Track peer reputation for optimal routing
+```
+
 ## Configuration
 
-SomaSync supports extensive configuration:
+SomaSync supports extensive configuration for both basic and enterprise deployments:
+
+### Basic Configuration
 
 ```rust
 use somasync::{SynapseNodeBuilder, GossipConfig};
@@ -169,6 +234,7 @@ let gossip_config = GossipConfig {
     fanout: 5,
     gossip_interval: Duration::from_secs(15),
     max_message_age: Duration::from_secs(1800),
+    max_stored_messages: 10_000,
     ..Default::default()
 };
 
@@ -177,6 +243,26 @@ let (node, _, _) = SynapseNodeBuilder::new()
     .with_gossip_config(gossip_config)
     .with_auto_discovery(true)
     .build();
+```
+
+### Enterprise Configuration
+
+```rust
+use somasync::EnterpriseGossipConfig;
+
+// Threat intelligence network configuration
+let enterprise_config = EnterpriseGossipConfig::for_threat_intel()
+    .with_adaptive_fanout(10, 50)     // Scale based on network conditions
+    .with_priority_routing()           // Critical alerts get priority
+    .with_smart_routing()              // Reputation-based peer selection
+    .with_bandwidth_limit(100_000_000) // 100MB/s limit
+    .with_batch_size(100)             // Batch messages for efficiency
+    .with_epidemic_tuning(0.1, 0.9);  // Fine-tune gossip parameters
+
+// Large-scale SOC network configuration  
+let large_scale_config = EnterpriseGossipConfig::for_large_networks()
+    .with_adaptive_fanout(50, 200)    // Higher fanout for large networks
+    .with_bandwidth_limit(1_000_000_000); // 1GB/s for high-throughput
 ```
 
 ## Monitoring
@@ -207,7 +293,9 @@ cargo test --all-features
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+**Development Status**: This project is currently in a development freeze while core features are stabilized for production deployment. The main branch is protected and new contributions are temporarily paused.
+
+For future contribution opportunities and guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 📄 License
 
@@ -229,8 +317,18 @@ SomaSync draws inspiration from:
 
 ## Roadmap
 
+### Completed
+- [x] **Message Signing**: Ed25519 cryptographic signatures for message authenticity
+- [x] **Enterprise Gossip**: Optimized protocols for 10K+ node networks
+- [x] **Adaptive Algorithms**: Dynamic fanout, priority routing, bandwidth management
+
+### In Progress
+- [ ] Basic network-level flood protection
+- [ ] Monitoring and observability APIs
+- [ ] Reputation system and fault detection
+
+### Future
 - [ ] WebRTC transport support
-- [ ] Byzantine fault tolerance
 - [ ] Advanced routing algorithms (DHT, Kademlia)
 - [ ] Network simulation and testing tools
 - [ ] Performance benchmarking suite
