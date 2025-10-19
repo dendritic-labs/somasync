@@ -19,6 +19,7 @@ use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};
 
 /// A security operations center node for threat sharing
+#[allow(dead_code)]
 struct SecurityNode {
     name: String,
     gossip_protocol: GossipProtocol,
@@ -133,6 +134,7 @@ impl SecurityNode {
     }
 
     /// Process incoming threat intelligence
+    #[allow(dead_code)]
     async fn process_incoming_threats(&mut self) {
         while let Some(threat_message) = self.threat_message_rx.recv().await {
             // Verify message signature for authenticity

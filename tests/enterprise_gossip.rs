@@ -91,9 +91,11 @@ async fn test_threat_intel_preset() {
 #[tokio::test]
 async fn test_enterprise_config_with_custom_base() {
     // Create custom base configuration
-    let mut base_config = GossipConfig::default();
-    base_config.fanout = 7;
-    base_config.max_stored_messages = 100_000;
+    let base_config = GossipConfig {
+        fanout: 7,
+        max_stored_messages: 100_000,
+        ..Default::default()
+    };
 
     // Build enterprise config with custom base
     let enterprise_config = EnterpriseGossipConfig::with_base(base_config)
