@@ -45,7 +45,7 @@ pub mod peer;
 
 // Re-export main types for convenience
 pub use error::SynapseError;
-pub use gossip::{GossipConfig, GossipProtocol, GossipStats};
+pub use gossip::{EnterpriseGossipConfig, GossipConfig, GossipProtocol, GossipStats, NetworkStats};
 pub use mesh::{MeshConfig, MeshNetwork, MeshStats, NetworkTopology, Route};
 pub use message::{priority, ttl, Message, MessageBatch, MessageEnvelope, MessageType};
 pub use node::{SynapseConfig, SynapseEvent, SynapseNode, SynapseNodeBuilder, SynapseStats};

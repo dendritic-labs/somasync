@@ -3,6 +3,7 @@
 //! This module defines the core message types used for communication
 //! across the neural mesh network.
 
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -33,6 +34,78 @@ pub enum MessageType {
     },
 }
 
+/// Digital signature for message integrity and authenticity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageSignature {
+    /// The actual signature bytes
+    pub signature: Vec<u8>,
+    /// Public key of the signer for verification
+    pub public_key: Vec<u8>,
+    /// Signature algorithm used
+    pub algorithm: String,
+    /// Timestamp when signature was created
+    pub signed_at: u64,
+}
+
+impl MessageSignature {
+    /// Create a new Ed25519 signature
+    pub fn new_ed25519(signature: Signature, public_key: VerifyingKey) -> Self {
+        let signed_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        Self {
+            signature: signature.to_bytes().to_vec(),
+            public_key: public_key.to_bytes().to_vec(),
+            algorithm: "Ed25519".to_string(),
+            signed_at,
+        }
+    }
+
+    /// Verify this signature against message content
+    pub fn verify(&self, message_content: &[u8]) -> Result<(), crate::error::SynapseError> {
+        match self.algorithm.as_str() {
+            "Ed25519" => self.verify_ed25519(message_content),
+            _ => Err(crate::error::SynapseError::Security(format!(
+                "Unsupported signature algorithm: {}",
+                self.algorithm
+            ))),
+        }
+    }
+
+    /// Verify Ed25519 signature
+    fn verify_ed25519(&self, message_content: &[u8]) -> Result<(), crate::error::SynapseError> {
+        // Reconstruct public key
+        let public_key_bytes: [u8; 32] = self.public_key.as_slice().try_into().map_err(|_| {
+            crate::error::SynapseError::Security("Invalid public key length".to_string())
+        })?;
+        let public_key = VerifyingKey::from_bytes(&public_key_bytes).map_err(|e| {
+            crate::error::SynapseError::Security(format!("Invalid public key: {}", e))
+        })?;
+
+        // Reconstruct signature
+        let signature_bytes: [u8; 64] = self.signature.as_slice().try_into().map_err(|_| {
+            crate::error::SynapseError::Security("Invalid signature length".to_string())
+        })?;
+        let signature = Signature::try_from(signature_bytes.as_slice()).map_err(|e| {
+            crate::error::SynapseError::Security(format!("Invalid signature: {}", e))
+        })?;
+
+        // Verify signature
+        public_key
+            .verify(message_content, &signature)
+            .map_err(|e| {
+                crate::error::SynapseError::Security(format!(
+                    "Signature verification failed: {}",
+                    e
+                ))
+            })?;
+
+        Ok(())
+    }
+}
+
 /// Core message structure for network communication
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -52,6 +125,8 @@ pub struct Message {
     pub correlation_id: Option<String>,
     /// Custom headers/metadata
     pub headers: HashMap<String, String>,
+    /// Digital signature for message integrity (optional)
+    pub signature: Option<MessageSignature>,
 }
 
 impl Message {
@@ -72,6 +147,7 @@ impl Message {
             priority: 128, // Medium priority
             correlation_id: None,
             headers: HashMap::new(),
+            signature: None,
         }
     }
 
@@ -97,6 +173,46 @@ impl Message {
     pub fn with_header(mut self, key: String, value: String) -> Self {
         self.headers.insert(key, value);
         self
+    }
+
+    /// Sign the message with Ed25519 for integrity verification
+    pub fn sign_with_ed25519(mut self, signing_key: &SigningKey) -> Self {
+        let message_content = self.get_signable_content();
+        let signature = signing_key.sign(&message_content);
+        let public_key = signing_key.verifying_key();
+
+        self.signature = Some(MessageSignature::new_ed25519(signature, public_key));
+        self
+    }
+
+    /// Verify the message signature
+    pub fn verify_signature(&self) -> Result<bool, crate::error::SynapseError> {
+        if let Some(signature) = &self.signature {
+            let message_content = self.get_signable_content();
+            signature.verify(&message_content)?;
+            Ok(true)
+        } else {
+            Ok(false) // No signature present
+        }
+    }
+
+    /// Get the content that should be signed (everything except signature)
+    fn get_signable_content(&self) -> Vec<u8> {
+        let mut signable = self.clone();
+        signable.signature = None; // Remove signature for signing/verification
+
+        // Serialize to bytes for signing
+        serde_json::to_vec(&signable).unwrap_or_default()
+    }
+
+    /// Check if message is signed
+    pub fn is_signed(&self) -> bool {
+        self.signature.is_some()
+    }
+
+    /// Get the public key of the signer (if message is signed)
+    pub fn signer_public_key(&self) -> Option<&[u8]> {
+        self.signature.as_ref().map(|s| s.public_key.as_slice())
     }
 
     /// Check if message has expired
@@ -521,7 +637,8 @@ mod tests {
 
         let msg = Message::new(MessageType::Data("test".to_string()), "node1".to_string());
 
-        let envelope = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg));
+        let envelope =
+            MessageEnvelope::new("node1".to_string(), GossipMessage::Data(Box::new(msg)));
 
         assert_eq!(envelope.source_node, "node1");
         assert_eq!(envelope.hop_count, 0);
@@ -536,8 +653,8 @@ mod tests {
 
         let msg2 = Message::new(MessageType::Data("test2".to_string()), "node1".to_string());
 
-        let env1 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg1));
-        let env2 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg2));
+        let env1 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(Box::new(msg1)));
+        let env2 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(Box::new(msg2)));
 
         let batch = MessageBatch::new(vec![env1, env2]).with_checksum();
 
@@ -583,5 +700,67 @@ mod tests {
         assert_eq!(ttl::IMMEDIATE, 60);
         assert_eq!(ttl::MEDIUM, 3600);
         assert_eq!(ttl::PERSISTENT, 604800);
+    }
+
+    #[test]
+    fn test_message_signing() {
+        use rand::RngCore;
+
+        // Generate a signing key
+        let mut csprng = rand::rngs::OsRng;
+        let mut secret_bytes = [0u8; 32];
+        csprng.fill_bytes(&mut secret_bytes);
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
+
+        // Create and sign a message
+        let msg = Message::new(
+            MessageType::Data("sensitive threat intel".to_string()),
+            "threat-detector-1".to_string(),
+        )
+        .sign_with_ed25519(&signing_key);
+
+        // Verify the message is signed
+        assert!(msg.is_signed());
+        assert!(msg.signer_public_key().is_some());
+
+        // Verify the signature
+        assert!(msg.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn test_message_signature_verification_fails_on_tampered_content() {
+        use rand::RngCore;
+
+        // Generate a signing key
+        let mut csprng = rand::rngs::OsRng;
+        let mut secret_bytes = [0u8; 32];
+        csprng.fill_bytes(&mut secret_bytes);
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
+
+        // Create and sign a message
+        let mut msg = Message::new(
+            MessageType::Data("original content".to_string()),
+            "node1".to_string(),
+        )
+        .sign_with_ed25519(&signing_key);
+
+        // Tamper with the message content after signing
+        msg.message_type = MessageType::Data("tampered content".to_string());
+
+        // Verification should fail
+        assert!(msg.verify_signature().is_err());
+    }
+
+    #[test]
+    fn test_unsigned_message_verification() {
+        let msg = Message::new(
+            MessageType::Data("unsigned message".to_string()),
+            "node1".to_string(),
+        );
+
+        // Unsigned message should return false (not error)
+        assert!(!msg.verify_signature().unwrap());
+        assert!(!msg.is_signed());
+        assert!(msg.signer_public_key().is_none());
     }
 }

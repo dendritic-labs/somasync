@@ -89,7 +89,7 @@ pub enum SynapseEvent {
     /// Peer disconnected
     PeerDisconnected { peer_id: String, reason: String },
     /// Message received from network
-    MessageReceived { from: String, message: Message },
+    MessageReceived { from: String, message: Box<Message> },
     /// Message sent to network
     MessageSent { to: String, message_id: u64 },
     /// Network partition detected
@@ -433,7 +433,7 @@ impl SynapseNode {
         // Emit event
         self.emit_event(SynapseEvent::MessageReceived {
             from: from.to_string(),
-            message: message.clone(),
+            message: Box::new(message.clone()),
         })
         .await;
 

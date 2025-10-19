@@ -35,6 +35,29 @@ pub struct GossipConfig {
     pub sync_interval: Duration,
 }
 
+/// Builder for enterprise-scale gossip configuration
+#[derive(Debug, Clone)]
+pub struct EnterpriseGossipConfig {
+    /// Base configuration
+    pub base: GossipConfig,
+    /// Enable adaptive fanout based on network size
+    pub adaptive_fanout: bool,
+    /// Maximum fanout for large networks
+    pub max_fanout: usize,
+    /// Enable message prioritization
+    pub priority_routing: bool,
+    /// Maximum bandwidth per second (bytes)
+    pub max_bandwidth_per_sec: Option<usize>,
+    /// Enable smart routing (prefer high-reputation peers)
+    pub smart_routing: bool,
+    /// Batch size for message transmission
+    pub batch_size: usize,
+    /// Enable epidemic parameter tuning
+    pub epidemic_tuning: bool,
+    /// Target message delivery probability (0.0-1.0)
+    pub target_delivery_probability: f64,
+}
+
 impl Default for GossipConfig {
     fn default() -> Self {
         Self {
@@ -49,21 +72,136 @@ impl Default for GossipConfig {
     }
 }
 
+impl EnterpriseGossipConfig {
+    /// Create a new builder with default base configuration
+    pub fn builder() -> Self {
+        Self {
+            base: GossipConfig::default(),
+            adaptive_fanout: false,
+            max_fanout: 10,
+            priority_routing: false,
+            max_bandwidth_per_sec: None,
+            smart_routing: false,
+            batch_size: 1,
+            epidemic_tuning: false,
+            target_delivery_probability: 0.95,
+        }
+    }
+
+    /// Create builder with custom base configuration
+    pub fn with_base(base: GossipConfig) -> Self {
+        Self {
+            base,
+            adaptive_fanout: false,
+            max_fanout: 10,
+            priority_routing: false,
+            max_bandwidth_per_sec: None,
+            smart_routing: false,
+            batch_size: 1,
+            epidemic_tuning: false,
+            target_delivery_probability: 0.95,
+        }
+    }
+
+    /// Enable adaptive fanout for large networks
+    pub fn with_adaptive_fanout(mut self, max_fanout: usize) -> Self {
+        self.adaptive_fanout = true;
+        self.max_fanout = max_fanout;
+        self
+    }
+
+    /// Enable message prioritization for threat intel
+    pub fn with_priority_routing(mut self) -> Self {
+        self.priority_routing = true;
+        self
+    }
+
+    /// Set bandwidth limit for enterprise networks
+    pub fn with_bandwidth_limit(mut self, bytes_per_sec: usize) -> Self {
+        self.max_bandwidth_per_sec = Some(bytes_per_sec);
+        self
+    }
+
+    /// Enable smart routing based on peer reputation
+    pub fn with_smart_routing(mut self) -> Self {
+        self.smart_routing = true;
+        self
+    }
+
+    /// Set batch size for efficient transmission
+    pub fn with_batch_size(mut self, batch_size: usize) -> Self {
+        self.batch_size = batch_size;
+        self
+    }
+
+    /// Enable epidemic parameter tuning
+    pub fn with_epidemic_tuning(mut self, target_probability: f64) -> Self {
+        self.epidemic_tuning = true;
+        self.target_delivery_probability = target_probability;
+        self
+    }
+
+    /// Create config optimized for enterprise threat intel sharing
+    pub fn for_threat_intel() -> Self {
+        Self::builder()
+            .with_adaptive_fanout(15)
+            .with_priority_routing()
+            .with_bandwidth_limit(5_000_000) // 5MB/s
+            .with_smart_routing()
+            .with_batch_size(25)
+            .with_epidemic_tuning(0.999)
+    }
+
+    /// Calculate optimal fanout based on network size
+    pub fn calculate_adaptive_fanout(&self, network_size: usize) -> usize {
+        if !self.adaptive_fanout {
+            return self.base.fanout;
+        }
+
+        // Epidemic theory: fanout should scale with log(network_size) for optimal propagation
+        let optimal_fanout = ((network_size as f64).ln().ceil() as usize).max(self.base.fanout);
+        optimal_fanout.min(self.max_fanout)
+    }
+
+    /// Calculate optimal gossip interval based on network conditions
+    pub fn calculate_adaptive_interval(
+        &self,
+        network_latency_ms: u64,
+        network_size: usize,
+    ) -> Duration {
+        if !self.epidemic_tuning {
+            return self.base.gossip_interval;
+        }
+
+        // Adjust interval based on network latency and size
+        let base_interval_ms = self.base.gossip_interval.as_millis() as u64;
+        let latency_factor = (network_latency_ms / 10).max(1); // Adjust for latency
+        let size_factor = ((network_size / 1000).max(1)) as u64; // Adjust for network size
+
+        let adaptive_interval_ms = (base_interval_ms + latency_factor + size_factor).min(300_000); // Max 5 minutes
+        Duration::from_millis(adaptive_interval_ms)
+    }
+}
+
 /// Types of gossip messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GossipMessage {
     /// User data message
-    Data(Message),
+    Data(Box<Message>),
     /// Request for specific message by hash
-    MessageRequest(u64),
-    /// Heartbeat to maintain peer connections
+    Request { hash: String },
+    /// Heartbeat for peer discovery
     Heartbeat { node_id: String, timestamp: u64 },
-    /// Anti-entropy synchronization request
-    SyncRequest { known_hashes: Vec<u64> },
-    /// Anti-entropy synchronization response
-    SyncResponse { missing_messages: Vec<Message> },
-    /// Acknowledgment of received message
+    /// Response to confirm message receipt  
+    Response { hash: String, status: String },
+    /// Acknowledgment for delivered messages
     Ack { message_id: u64 },
+    /// Request for specific message by hash (old style)
+    MessageRequest(u64),
+    /// Sync request with known message hashes
+    SyncRequest { known_hashes: Vec<u64> },
+    /// Sync response with missing messages
+    SyncResponse { missing_messages: Vec<Message> },
 }
 
 /// Message cache for deduplication and anti-entropy
@@ -188,6 +326,188 @@ impl MessageCache {
     }
 }
 
+/// Priority-based message queue for enterprise routing
+#[derive(Debug)]
+#[allow(dead_code)]
+struct PriorityMessageQueue {
+    /// High priority messages (threats, alerts)
+    high_priority: VecDeque<MessageEnvelope>,
+    /// Normal priority messages
+    normal_priority: VecDeque<MessageEnvelope>,
+    /// Low priority messages (background sync)
+    low_priority: VecDeque<MessageEnvelope>,
+    /// Maximum queue size per priority
+    max_queue_size: usize,
+}
+
+#[allow(dead_code)]
+impl PriorityMessageQueue {
+    fn new(max_queue_size: usize) -> Self {
+        Self {
+            high_priority: VecDeque::new(),
+            normal_priority: VecDeque::new(),
+            low_priority: VecDeque::new(),
+            max_queue_size,
+        }
+    }
+
+    fn enqueue(&mut self, envelope: MessageEnvelope, priority: u8) {
+        let queue = match priority {
+            200..=255 => &mut self.high_priority,
+            100..=199 => &mut self.normal_priority,
+            _ => &mut self.low_priority,
+        };
+
+        if queue.len() >= self.max_queue_size {
+            queue.pop_front(); // Drop oldest message if queue is full
+        }
+        queue.push_back(envelope);
+    }
+
+    fn dequeue(&mut self) -> Option<MessageEnvelope> {
+        // Process high priority first, then normal, then low
+        self.high_priority
+            .pop_front()
+            .or_else(|| self.normal_priority.pop_front())
+            .or_else(|| self.low_priority.pop_front())
+    }
+
+    fn len(&self) -> usize {
+        self.high_priority.len() + self.normal_priority.len() + self.low_priority.len()
+    }
+}
+
+/// Bandwidth limiting for enterprise networks
+#[derive(Debug)]
+#[allow(dead_code)]
+struct BandwidthLimiter {
+    /// Maximum bytes per second
+    max_bytes_per_sec: usize,
+    /// Bytes sent in current second
+    bytes_sent_current_sec: usize,
+    /// Current second (Unix timestamp)
+    current_second: u64,
+}
+
+#[allow(dead_code)]
+impl BandwidthLimiter {
+    fn new(max_bytes_per_sec: usize) -> Self {
+        Self {
+            max_bytes_per_sec,
+            bytes_sent_current_sec: 0,
+            current_second: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        }
+    }
+
+    fn can_send(&mut self, bytes: usize) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Reset counter if we're in a new second
+        if now > self.current_second {
+            self.current_second = now;
+            self.bytes_sent_current_sec = 0;
+        }
+
+        self.bytes_sent_current_sec + bytes <= self.max_bytes_per_sec
+    }
+
+    fn record_sent(&mut self, bytes: usize) {
+        self.bytes_sent_current_sec += bytes;
+    }
+}
+
+/// Peer reputation tracking for enterprise networks
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+struct PeerReputation {
+    /// Trust score (0.0 - 1.0)
+    trust_score: f64,
+    /// Number of successful message deliveries
+    successful_deliveries: u64,
+    /// Number of failed deliveries
+    failed_deliveries: u64,
+    /// Average response time in milliseconds
+    avg_response_time_ms: u64,
+    /// Last seen timestamp
+    last_seen: u64,
+    /// Number of invalid messages received
+    invalid_messages: u64,
+}
+
+#[allow(dead_code)]
+impl PeerReputation {
+    fn new() -> Self {
+        Self {
+            trust_score: 0.5, // Start with neutral trust
+            successful_deliveries: 0,
+            failed_deliveries: 0,
+            avg_response_time_ms: 1000,
+            last_seen: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            invalid_messages: 0,
+        }
+    }
+
+    fn update_success(&mut self, response_time_ms: u64) {
+        self.successful_deliveries += 1;
+        self.last_seen = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Update average response time (exponential moving average)
+        self.avg_response_time_ms = (self.avg_response_time_ms * 7 + response_time_ms) / 8;
+
+        // Increase trust score
+        self.trust_score = (self.trust_score + 0.01).min(1.0);
+    }
+
+    fn update_failure(&mut self) {
+        self.failed_deliveries += 1;
+
+        // Decrease trust score
+        self.trust_score = (self.trust_score - 0.05).max(0.0);
+    }
+
+    fn update_invalid_message(&mut self) {
+        self.invalid_messages += 1;
+
+        // Significantly decrease trust score for invalid messages
+        self.trust_score = (self.trust_score - 0.1).max(0.0);
+    }
+
+    fn is_trustworthy(&self) -> bool {
+        self.trust_score >= 0.6
+    }
+}
+
+/// Network statistics for monitoring
+#[derive(Debug, Default, Clone)]
+pub struct NetworkStats {
+    /// Total messages sent
+    pub messages_sent: u64,
+    /// Total messages received
+    pub messages_received: u64,
+    /// Total bytes sent
+    pub bytes_sent: u64,
+    /// Total bytes received
+    pub bytes_received: u64,
+    /// Number of active peers
+    pub active_peers: usize,
+    /// Average network latency
+    pub avg_latency_ms: u64,
+    /// Message delivery rate
+    pub delivery_rate: f64,
+}
+
 /// Gossip protocol implementation
 pub struct GossipProtocol {
     /// Our node identifier
@@ -204,10 +524,28 @@ pub struct GossipProtocol {
     inbound_rx: Arc<RwLock<Option<mpsc::UnboundedReceiver<MessageEnvelope>>>>,
     /// Channel for processed messages
     message_tx: mpsc::UnboundedSender<Message>,
+    /// Optional enterprise features
+    enterprise_features: Option<EnterpriseFeatures>,
+}
+
+/// Enterprise features for large-scale deployments
+#[derive(Debug)]
+#[allow(dead_code)]
+struct EnterpriseFeatures {
+    /// Enterprise configuration
+    config: EnterpriseGossipConfig,
+    /// Priority queue for message routing
+    priority_queue: Arc<RwLock<PriorityMessageQueue>>,
+    /// Bandwidth limiting
+    bandwidth_limiter: Arc<RwLock<BandwidthLimiter>>,
+    /// Peer reputation tracking
+    peer_reputation: Arc<RwLock<HashMap<String, PeerReputation>>>,
+    /// Network statistics
+    network_stats: Arc<RwLock<NetworkStats>>,
 }
 
 impl GossipProtocol {
-    /// Create a new gossip protocol instance
+    /// Create a new basic gossip protocol instance
     pub fn new(
         node_id: String,
         config: GossipConfig,
@@ -224,9 +562,65 @@ impl GossipProtocol {
             outbound_tx,
             inbound_rx: Arc::new(RwLock::new(Some(inbound_rx))),
             message_tx,
+            enterprise_features: None,
         };
 
         (protocol, outbound_rx)
+    }
+
+    /// Create a new enterprise gossip protocol instance with advanced features
+    pub fn new_enterprise(
+        node_id: String,
+        enterprise_config: EnterpriseGossipConfig,
+        message_tx: mpsc::UnboundedSender<Message>,
+    ) -> (Self, mpsc::UnboundedReceiver<(SocketAddr, MessageEnvelope)>) {
+        let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
+        let (_inbound_tx, inbound_rx) = mpsc::unbounded_channel();
+
+        let config = enterprise_config.base.clone();
+        let max_stored = config.max_stored_messages;
+
+        let enterprise_features = EnterpriseFeatures {
+            config: enterprise_config.clone(),
+            priority_queue: Arc::new(RwLock::new(PriorityMessageQueue::new(max_stored))),
+            bandwidth_limiter: Arc::new(RwLock::new(BandwidthLimiter::new(
+                enterprise_config.max_bandwidth_per_sec.unwrap_or(1_000_000),
+            ))),
+            peer_reputation: Arc::new(RwLock::new(HashMap::new())),
+            network_stats: Arc::new(RwLock::new(NetworkStats::default())),
+        };
+
+        let protocol = Self {
+            node_id,
+            config,
+            peers: Arc::new(RwLock::new(HashMap::new())),
+            cache: Arc::new(RwLock::new(MessageCache::new(max_stored))),
+            outbound_tx,
+            inbound_rx: Arc::new(RwLock::new(Some(inbound_rx))),
+            message_tx,
+            enterprise_features: Some(enterprise_features),
+        };
+
+        (protocol, outbound_rx)
+    }
+
+    /// Get the node ID
+    pub fn node_id(&self) -> &str {
+        &self.node_id
+    }
+
+    /// Check if enterprise features are enabled
+    pub fn has_enterprise_features(&self) -> bool {
+        self.enterprise_features.is_some()
+    }
+
+    /// Get network statistics (enterprise feature)
+    pub async fn get_network_stats(&self) -> Option<NetworkStats> {
+        if let Some(enterprise) = &self.enterprise_features {
+            Some(enterprise.network_stats.read().await.clone())
+        } else {
+            None
+        }
     }
 
     /// Start the gossip protocol
@@ -272,7 +666,8 @@ impl GossipProtocol {
 
     /// Gossip a message to the network
     pub async fn gossip_message(&self, message: Message) -> Result<(), SynapseError> {
-        let envelope = MessageEnvelope::new(self.node_id.clone(), GossipMessage::Data(message));
+        let envelope =
+            MessageEnvelope::new(self.node_id.clone(), GossipMessage::Data(Box::new(message)));
         self.broadcast_message(envelope).await
     }
 
@@ -303,10 +698,10 @@ impl GossipProtocol {
         match &envelope.message {
             GossipMessage::Data(message) => {
                 debug!("Received data message from {}", envelope.source_node);
-                cache.cache_message(message.clone());
+                cache.cache_message((**message).clone());
 
                 // Forward to local message processor
-                if let Err(e) = self.message_tx.send(message.clone()) {
+                if let Err(e) = self.message_tx.send((**message).clone()) {
                     warn!("Failed to forward message: {}", e);
                 }
 
@@ -321,7 +716,7 @@ impl GossipProtocol {
                 if let Some(message) = cache.get_message(*hash) {
                     let _response = MessageEnvelope::new(
                         self.node_id.clone(),
-                        GossipMessage::Data(message.clone()),
+                        GossipMessage::Data(Box::new(message.clone())),
                     );
                     // Send directly back to requester
                     // This would be implemented with direct peer communication
@@ -355,6 +750,16 @@ impl GossipProtocol {
             GossipMessage::Ack { message_id } => {
                 debug!("Received ack for message {}", message_id);
                 // Handle acknowledgment if needed
+            }
+
+            GossipMessage::Request { hash } => {
+                debug!("Received request for hash {}", hash);
+                // Handle request by hash string
+            }
+
+            GossipMessage::Response { hash, status } => {
+                debug!("Received response for hash {} with status {}", hash, status);
+                // Handle response
             }
         }
 
