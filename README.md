@@ -1,4 +1,4 @@
-# SomaSync 🧠
+# SomaSync
 
 [![Crates.io](https://img.shields.io/crates/v/somasync)](https://crates.io/crates/somasync)
 [![Documentation](https://docs.rs/somasync/badge.svg)](https://docs.rs/somasync)
@@ -9,16 +9,16 @@
 
 SomaSync is a high-performance, self-organizing mesh networking library that enables distributed systems to communicate efficiently through adaptive neural-like pathways.
 
-## ✨ Features
+## Features
 
-- **🧠 Neural-Inspired Architecture**: Nodes communicate like neurons via synaptic connections
-- **🌐 Self-Organizing Mesh**: Automatic peer discovery and topology optimization  
-- **💬 Gossip Protocols**: Efficient data propagation with anti-entropy guarantees
-- **🔄 Self-Healing**: Automatic failure detection and network recovery
-- **⚡ High Performance**: Zero-copy serialization and connection pooling
-- **🛡️ Production Ready**: Comprehensive error handling and monitoring
+- **Neural-Inspired Architecture**: Nodes communicate like neurons via synaptic connections
+- **Self-Organizing Mesh**: Automatic peer discovery and topology optimization  
+- **Gossip Protocols**: Efficient data propagation with anti-entropy guarantees
+- **Self-Healing**: Automatic failure detection and network recovery
+- **High Performance**: Zero-copy serialization and connection pooling
+- **Production Ready**: Comprehensive error handling and monitoring
 
-## 🚀 Quick Start
+## Quick Start
 
 Add SomaSync to your `Cargo.toml`:
 
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 SomaSync consists of several key components:
 
@@ -86,7 +86,7 @@ The architecture is inspired by neural networks:
 - **Messages** flow along optimized pathways
 - **Routing** adapts based on network conditions and usage patterns
 
-## 📖 Examples
+## Examples
 
 ### Basic Mesh Network
 
@@ -157,7 +157,7 @@ tokio::spawn(async move {
 });
 ```
 
-## 🔧 Configuration
+## Configuration
 
 SomaSync supports extensive configuration:
 
@@ -179,7 +179,7 @@ let (node, _, _) = SynapseNodeBuilder::new()
     .build();
 ```
 
-## 📊 Monitoring
+## Monitoring
 
 Get real-time network statistics:
 
@@ -191,7 +191,7 @@ println!("Messages processed: {}", stats.messages_processed);
 println!("Healthy peers: {}", stats.peer_stats.healthy_peers);
 ```
 
-## 🧪 Testing
+## Testing
 
 Run the test suite:
 
@@ -205,7 +205,7 @@ Run with coverage:
 cargo test --all-features
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
@@ -227,7 +227,7 @@ SomaSync draws inspiration from:
 - Self-organizing systems and emergent behavior
 - Distributed hash tables and peer-to-peer networks
 
-## 🛣️ Roadmap
+## Roadmap
 
 - [ ] WebRTC transport support
 - [ ] Byzantine fault tolerance
@@ -238,4 +238,4 @@ SomaSync draws inspiration from:
 
 ---
 
-Made with ❤️ by [Dendritic Labs](https://github.com/dendritic-labs)
+Made by [Dendritic Labs](https://github.com/dendritic-labs)

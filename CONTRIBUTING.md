@@ -1,8 +1,8 @@
-# Contributing to SomaSync 🧠
+# Contributing to SomaSync
 
 Thank you for your interest in contributing to SomaSync! We welcome contributions from the community and are excited to see what you'll build.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -27,7 +27,7 @@ Thank you for your interest in contributing to SomaSync! We welcome contribution
    git checkout -b feature/your-feature-name
    ```
 
-## 🔄 Development Workflow
+## Development Workflow
 
 ### Before You Start
 
@@ -71,7 +71,7 @@ cargo bench
 cargo test --release -- --nocapture
 ```
 
-## 📋 Pull Request Process
+## Pull Request Process
 
 ### Before Submitting
 
@@ -116,7 +116,7 @@ Brief description of changes
 - [ ] CHANGELOG.md updated
 ```
 
-## 🏷️ Issue Guidelines
+## Issue Guidelines
 
 ### Bug Reports
 
@@ -134,7 +134,7 @@ Use the bug report template and include:
 - Consider backwards compatibility
 - Suggest an implementation approach if possible
 
-## 🎯 Code Style
+## Code Style
 
 ### Rust Conventions
 
@@ -194,7 +194,7 @@ docs(api): update SynapseNode examples
 - `docs/short-description` - Documentation updates
 - `refactor/short-description` - Code refactoring
 
-## 🏆 Recognition
+## Recognition
 
 Contributors are recognized in several ways:
 
@@ -215,10 +215,10 @@ Contributors are recognized in several ways:
 This project follows the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct). 
 By participating, you agree to uphold this code.
 
-## 🔒 Security
+## Security
 
 For security-related issues, please see [SECURITY.md](SECURITY.md) for responsible disclosure guidelines.
 
 ---
 
-Thank you for contributing to SomaSync! 🧠✨
+Thank you for contributing to SomaSync!

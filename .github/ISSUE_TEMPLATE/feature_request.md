@@ -1,24 +1,24 @@
 ---
-name: ✨ Feature Request
+name: Feature Request
 about: Suggest an idea for SomaSync
 title: '[FEATURE] '
 labels: 'enhancement'
 assignees: ''
 ---
 
-## 🎯 Problem Statement
+## Problem Statement
 
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
 
-## 💡 Proposed Solution
+## Proposed Solution
 
 A clear and concise description of what you want to happen.
 
-## 🔄 Alternative Solutions
+## Alternative Solutions
 
 A clear and concise description of any alternative solutions or features you've considered.
 
-## 📋 Use Cases
+## Use Cases
 
 Describe specific use cases where this feature would be valuable:
 
@@ -26,7 +26,7 @@ Describe specific use cases where this feature would be valuable:
 2. Use case 2...
 3. Use case 3...
 
-## 🏗️ Implementation Ideas
+## Implementation Ideas
 
 If you have ideas about how this could be implemented, share them here:
 
@@ -35,7 +35,7 @@ If you have ideas about how this could be implemented, share them here:
 - Performance implications
 - Backwards compatibility
 
-## 📊 Priority
+## Priority
 
 How important is this feature to you?
 
@@ -44,7 +44,7 @@ How important is this feature to you?
 - [ ] Medium - would be nice to have
 - [ ] Low - minor improvement
 
-## 🤝 Contribution
+## Contribution
 
 Are you willing to contribute to this feature?
 
@@ -53,6 +53,6 @@ Are you willing to contribute to this feature?
 - [ ] Yes, I can help with documentation
 - [ ] No, but I can provide feedback
 
-## 📝 Additional Context
+## Additional Context
 
 Add any other context, mockups, or examples about the feature request here.
