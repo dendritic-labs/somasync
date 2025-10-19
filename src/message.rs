@@ -3,12 +3,12 @@
 //! This module defines the core message types used for communication
 //! across the neural mesh network.
 
+use ed25519_dalek::{Keypair, PublicKey, Signature, Signer, Verifier};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
-use ed25519_dalek::{Signature, Signer, Keypair, PublicKey, Verifier};
 
 /// Types of messages that can be sent across the network
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -93,9 +93,14 @@ impl MessageSignature {
         })?;
 
         // Verify signature
-        public_key.verify(message_content, &signature).map_err(|e| {
-            crate::error::SynapseError::Security(format!("Signature verification failed: {}", e))
-        })?;
+        public_key
+            .verify(message_content, &signature)
+            .map_err(|e| {
+                crate::error::SynapseError::Security(format!(
+                    "Signature verification failed: {}",
+                    e
+                ))
+            })?;
 
         Ok(())
     }
@@ -175,7 +180,7 @@ impl Message {
         let message_content = self.get_signable_content();
         let signature = keypair.sign(&message_content);
         let public_key = keypair.public;
-        
+
         self.signature = Some(MessageSignature::new_ed25519(signature, public_key));
         self
     }
@@ -195,7 +200,7 @@ impl Message {
     fn get_signable_content(&self) -> Vec<u8> {
         let mut signable = self.clone();
         signable.signature = None; // Remove signature for signing/verification
-        
+
         // Serialize to bytes for signing
         serde_json::to_vec(&signable).unwrap_or_default()
     }
