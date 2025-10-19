@@ -25,6 +25,10 @@ pub enum SynapseError {
     #[error("Gossip protocol error: {message}")]
     Gossip { message: String },
 
+    /// Security and cryptographic errors
+    #[error("Security error: {0}")]
+    Security(String),
+
     /// I/O errors
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -74,5 +78,10 @@ impl SynapseError {
         Self::Gossip {
             message: message.into(),
         }
+    }
+
+    /// Create a security error
+    pub fn security(message: impl Into<String>) -> Self {
+        Self::Security(message.into())
     }
 }
