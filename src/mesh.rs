@@ -612,7 +612,9 @@ impl MeshNetwork {
 
             let node_info = NodeInfo {
                 id: self.node_id.clone(),
-                address: "127.0.0.1:0".parse().unwrap_or_else(|_| ([127, 0, 0, 1], 0).into()), // This should be our actual address
+                address: "127.0.0.1:0"
+                    .parse()
+                    .unwrap_or_else(|_| ([127, 0, 0, 1], 0).into()), // This should be our actual address
                 capabilities: HashSet::new(),
                 load: 50,  // This should be calculated based on actual load
                 uptime: 0, // This should be actual uptime

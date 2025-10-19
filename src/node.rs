@@ -41,7 +41,9 @@ impl Default for SynapseConfig {
     fn default() -> Self {
         Self {
             node_id: None,
-            bind_address: "127.0.0.1:0".parse().unwrap_or_else(|_| ([127, 0, 0, 1], 0).into()),
+            bind_address: "127.0.0.1:0"
+                .parse()
+                .unwrap_or_else(|_| ([127, 0, 0, 1], 0).into()),
             gossip: GossipConfig::default(),
             mesh: MeshConfig::default(),
             discovery: DiscoveryConfig::default(),
