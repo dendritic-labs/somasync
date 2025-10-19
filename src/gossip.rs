@@ -266,7 +266,7 @@ impl MessageCache {
     fn evict_old_messages(&mut self) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         // Remove messages older than 1 hour
@@ -297,7 +297,7 @@ impl MessageCache {
     fn evict_old_messages_from_cache(&mut self) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         // Remove expired messages
@@ -397,7 +397,7 @@ impl BandwidthLimiter {
             bytes_sent_current_sec: 0,
             current_second: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         }
     }
@@ -405,7 +405,7 @@ impl BandwidthLimiter {
     fn can_send(&mut self, bytes: usize) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         // Reset counter if we're in a new second
@@ -450,7 +450,7 @@ impl PeerReputation {
             avg_response_time_ms: 1000,
             last_seen: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             invalid_messages: 0,
         }
@@ -460,7 +460,7 @@ impl PeerReputation {
         self.successful_deliveries += 1;
         self.last_seen = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         // Update average response time (exponential moving average)
@@ -838,7 +838,7 @@ impl GossipProtocol {
             // Send heartbeat
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs();
 
             let heartbeat = MessageEnvelope::new(

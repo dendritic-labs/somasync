@@ -52,7 +52,7 @@ impl MessageSignature {
     pub fn new_ed25519(signature: Signature, public_key: VerifyingKey) -> Self {
         let signed_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         Self {
@@ -135,7 +135,7 @@ impl Message {
         let id = Self::generate_id(&message_type, &source);
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         Self {
@@ -219,7 +219,7 @@ impl Message {
     pub fn is_expired(&self) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         now > self.timestamp + self.ttl
@@ -229,7 +229,7 @@ impl Message {
     pub fn age(&self) -> u64 {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         now.saturating_sub(self.timestamp)
@@ -242,7 +242,7 @@ impl Message {
         } else {
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs();
             (self.timestamp + self.ttl).saturating_sub(now)
         }
@@ -295,7 +295,7 @@ impl Message {
         source.hash(&mut hasher);
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_nanos()
             .hash(&mut hasher);
 
@@ -377,7 +377,7 @@ impl MessageEnvelope {
         let message_id = Self::generate_envelope_id(&source_node, &message);
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         Self {
@@ -419,7 +419,7 @@ impl MessageEnvelope {
     pub fn is_expired(&self) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
         let created_secs = self.timestamp;
 
@@ -435,7 +435,7 @@ impl MessageEnvelope {
     pub fn age(&self) -> Duration {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
         let created_secs = self.timestamp;
 
@@ -450,7 +450,7 @@ impl MessageEnvelope {
         source_node.hash(&mut hasher);
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_nanos()
             .hash(&mut hasher);
         Uuid::new_v4().to_string().hash(&mut hasher);
@@ -500,7 +500,7 @@ impl MessageBatch {
         let batch_id = Uuid::new_v4().to_string();
         let created_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         Self {
