@@ -637,7 +637,8 @@ mod tests {
 
         let msg = Message::new(MessageType::Data("test".to_string()), "node1".to_string());
 
-        let envelope = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg));
+        let envelope =
+            MessageEnvelope::new("node1".to_string(), GossipMessage::Data(Box::new(msg)));
 
         assert_eq!(envelope.source_node, "node1");
         assert_eq!(envelope.hop_count, 0);
@@ -652,8 +653,8 @@ mod tests {
 
         let msg2 = Message::new(MessageType::Data("test2".to_string()), "node1".to_string());
 
-        let env1 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg1));
-        let env2 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(msg2));
+        let env1 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(Box::new(msg1)));
+        let env2 = MessageEnvelope::new("node1".to_string(), GossipMessage::Data(Box::new(msg2)));
 
         let batch = MessageBatch::new(vec![env1, env2]).with_checksum();
 
