@@ -12,6 +12,10 @@ readme = "README.md"
 keywords = ["mesh", "gossip", "networking", "distributed", "p2p"]
 categories = ["network-programming", "asynchronous"]
 
+[features]
+default = []
+load-tests = []
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

@@ -1,11 +1,14 @@
 # SomaSync Makefile
 # Neural mesh networking library for distributed threat intelligence
 
-.PHONY: test build clean release load-test-small load-test-medium load-test-large load-test-million
+.PHONY: test build clean release load-test-small load-test-medium load-test-large load-test-million test-all test-with-load
 
 # Development targets
 test:
-	cargo test
+	cargo test --lib --tests
+
+test-with-load:
+	cargo test --features load-tests
 
 build:
 	cargo build
@@ -60,8 +63,10 @@ prepare-load-test:
 	@echo "Run 'ulimit -n 65536' if needed for high connection counts"
 
 # Run all test suites
-test-all: test load-test-small
-	@echo "✓ All tests completed successfully"
+test-all: test
+	@echo "✓ Core tests completed successfully"
+	@echo "Run 'make test-with-load' to include load tests"
+	@echo "Run 'make load-test-small' for quick load test validation"
 
 # Performance benchmarking  
 benchmark:

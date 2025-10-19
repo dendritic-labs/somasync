@@ -1,13 +1,13 @@
-use somasync::{SynapseNodeBuilder, Peer, Message, MessageType};
+use serde::{Deserialize, Serialize};
+use somasync::{Message, MessageType, Peer, SynapseNodeBuilder};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::time::{sleep, Duration, Instant};
+use std::sync::Arc;
 use tokio::sync::Semaphore;
-use serde::{Serialize, Deserialize};
+use tokio::time::{sleep, Duration, Instant};
 
 #[derive(Debug, Clone)]
-struct LoadTestConfig {
+pub struct LoadTestConfig {
     total_nodes: usize,
     batch_size: usize,
     batch_delay_ms: u64,
@@ -42,8 +42,10 @@ impl MillionNodeLoadTest {
 
     pub async fn run_demo_load_test(&self) -> Result<(), Box<dyn std::error::Error>> {
         println!("SomaSync Million Node Load Test Demo");
-        println!("Simulating {} nodes with {} concurrent connections", 
-                 self.config.total_nodes, self.config.max_concurrent_connections);
+        println!(
+            "Simulating {} nodes with {} concurrent connections",
+            self.config.total_nodes, self.config.max_concurrent_connections
+        );
 
         let start_time = Instant::now();
 
@@ -60,7 +62,10 @@ impl MillionNodeLoadTest {
         self.simulate_message_flood().await?;
 
         let total_time = start_time.elapsed();
-        println!("\n✓ Load test completed in {:.2} seconds", total_time.as_secs_f64());
+        println!(
+            "\n✓ Load test completed in {:.2} seconds",
+            total_time.as_secs_f64()
+        );
         self.print_final_stats();
 
         Ok(())
@@ -68,21 +73,26 @@ impl MillionNodeLoadTest {
 
     async fn simulate_massive_node_creation(&self) -> Result<(), Box<dyn std::error::Error>> {
         let batches = self.config.total_nodes / self.config.batch_size;
-        
+
         for batch in 0..batches {
             // Simulate creating a batch of nodes (without actually creating them)
             for _node in 0..self.config.batch_size {
                 self.stats.nodes_created.fetch_add(1, Ordering::Relaxed);
                 // Simulate connections per node (5-10 connections each)
                 let connections = 7; // Average connections per node
-                self.stats.connections_established.fetch_add(connections, Ordering::Relaxed);
+                self.stats
+                    .connections_established
+                    .fetch_add(connections, Ordering::Relaxed);
             }
 
             // Progress reporting
             if batch % 100 == 0 {
                 let progress = (batch as f64 / batches as f64) * 100.0;
                 let nodes_so_far = self.stats.nodes_created.load(Ordering::Relaxed);
-                println!("   Progress: {:.1}% - {} nodes created", progress, nodes_so_far);
+                println!(
+                    "   Progress: {:.1}% - {} nodes created",
+                    progress, nodes_so_far
+                );
             }
 
             // Small delay to simulate real work
@@ -105,11 +115,13 @@ impl MillionNodeLoadTest {
             // Small tests keep it manageable
             std::cmp::min(100, self.config.max_concurrent_connections / 10)
         };
-        
+
         let estimated_memory_mb = real_nodes_count * 3; // ~3MB per real SynapseNode
-        println!("   Creating {} real SynapseNodes (estimated ~{}MB RAM)...", 
-                 real_nodes_count, estimated_memory_mb);
-        
+        println!(
+            "   Creating {} real SynapseNodes (estimated ~{}MB RAM)...",
+            real_nodes_count, estimated_memory_mb
+        );
+
         if real_nodes_count > 1000 {
             println!("   AGGRESSIVE LOAD TEST - Pushing networking boundaries!");
             println!("   Monitor system memory and file descriptors");
@@ -119,14 +131,19 @@ impl MillionNodeLoadTest {
 
         // Create nodes in batches to avoid overwhelming the system
         let batch_size = std::cmp::min(100, real_nodes_count);
-        let batches = (real_nodes_count + batch_size - 1) / batch_size;
-        
+        let batches = real_nodes_count.div_ceil(batch_size);
+
         for batch in 0..batches {
             let batch_start = batch * batch_size;
             let batch_end = std::cmp::min(batch_start + batch_size, real_nodes_count);
-            
-            println!("   Creating batch {}/{}: nodes {}-{}", 
-                     batch + 1, batches, batch_start, batch_end - 1);
+
+            println!(
+                "   Creating batch {}/{}: nodes {}-{}",
+                batch + 1,
+                batches,
+                batch_start,
+                batch_end - 1
+            );
 
             for i in batch_start..batch_end {
                 let permit = self.connection_semaphore.clone().acquire_owned().await?;
@@ -144,30 +161,32 @@ impl MillionNodeLoadTest {
                         .build();
 
                     // Add peer connections to create a realistic network topology
-                    let connections_per_node = std::cmp::min(5, std::cmp::max(1, i));
+                    let connections_per_node = i.clamp(1, 5);
                     for peer_offset in 1..=connections_per_node {
                         if i >= peer_offset {
                             let peer_index = i - peer_offset;
                             let peer_port = port - peer_offset as u16;
                             let peer = Peer::new(
                                 format!("boundary-test-node-{}", peer_index),
-                                format!("127.0.0.1:{}", peer_port).parse().unwrap()
+                                format!("127.0.0.1:{}", peer_port).parse().unwrap(),
                             );
                             if node.add_peer(peer).await.is_ok() {
-                                stats.connections_established.fetch_add(1, Ordering::Relaxed);
+                                stats
+                                    .connections_established
+                                    .fetch_add(1, Ordering::Relaxed);
                             }
                         }
                     }
 
                     // Brief operational period to test stability
                     sleep(Duration::from_millis(200)).await;
-                    
+
                     Ok::<_, Box<dyn std::error::Error + Send + Sync>>(node_id)
                 });
 
                 handles.push(handle);
             }
-            
+
             // Small delay between batches to prevent overwhelming the system
             if batch < batches - 1 {
                 sleep(Duration::from_millis(100)).await;
@@ -177,7 +196,7 @@ impl MillionNodeLoadTest {
         // Wait for all real nodes to complete and count successes
         let mut successful_nodes = 0;
         let mut failed_nodes = 0;
-        
+
         for (i, handle) in handles.into_iter().enumerate() {
             match handle.await {
                 Ok(Ok(_)) => successful_nodes += 1,
@@ -191,17 +210,22 @@ impl MillionNodeLoadTest {
         }
 
         let success_rate = (successful_nodes as f64 / real_nodes_count as f64) * 100.0;
-        println!("   ✓ Boundary test results: {}/{} nodes successful ({:.1}% success rate)", 
-                 successful_nodes, real_nodes_count, success_rate);
-        
+        println!(
+            "   ✓ Boundary test results: {}/{} nodes successful ({:.1}% success rate)",
+            successful_nodes, real_nodes_count, success_rate
+        );
+
         if failed_nodes > 0 {
-            println!("   x {} nodes failed (resource limits, timeouts, or connection issues)", failed_nodes);
+            println!(
+                "   x {} nodes failed (resource limits, timeouts, or connection issues)",
+                failed_nodes
+            );
         }
-        
+
         if success_rate >= 90.0 {
             println!("   ✓ EXCELLENT: SomaSync handles high node density very well!");
         } else if success_rate >= 75.0 {
-            println!("   ✓ GOOD: SomaSync handles moderate node density well");  
+            println!("   ✓ GOOD: SomaSync handles moderate node density well");
         } else {
             println!("   x RESOURCE LIMITED: Consider reducing concurrent connections or increasing system limits");
         }
@@ -214,7 +238,10 @@ impl MillionNodeLoadTest {
         let message_tasks = std::cmp::min(100, self.config.max_concurrent_connections / 50);
         let mut handles = Vec::new();
 
-        println!("   Simulating message flood with {} generators...", message_tasks);
+        println!(
+            "   Simulating message flood with {} generators...",
+            message_tasks
+        );
 
         for task_id in 0..message_tasks {
             let stats = self.stats.clone();
@@ -228,7 +255,7 @@ impl MillionNodeLoadTest {
                     // Create threat intelligence message
                     let threat_data = create_sample_threat_data(task_id);
                     let _message = create_message_from_threat(threat_data);
-                    
+
                     messages_generated += 1;
                     stats.messages_sent.fetch_add(1, Ordering::Relaxed);
 
@@ -243,15 +270,23 @@ impl MillionNodeLoadTest {
         }
 
         // Monitor progress
-        let monitor_duration = Duration::from_secs(std::cmp::min(self.config.test_duration_secs, 30));
+        let monitor_duration =
+            Duration::from_secs(std::cmp::min(self.config.test_duration_secs, 30));
         let start_time = Instant::now();
 
         while start_time.elapsed() < monitor_duration {
             sleep(Duration::from_secs(5)).await;
             let messages = self.stats.messages_sent.load(Ordering::Relaxed);
             let elapsed = start_time.elapsed().as_secs();
-            let rate = if elapsed > 0 { messages as f64 / elapsed as f64 } else { 0.0 };
-            println!("   Message flood: {} messages, {:.1} msg/sec", messages, rate);
+            let rate = if elapsed > 0 {
+                messages as f64 / elapsed as f64
+            } else {
+                0.0
+            };
+            println!(
+                "   Message flood: {} messages, {:.1} msg/sec",
+                messages, rate
+            );
         }
 
         // Wait for completion
@@ -266,17 +301,28 @@ impl MillionNodeLoadTest {
     fn print_final_stats(&self) {
         println!("\nLOAD TEST RESULTS");
         println!("================================");
-        println!("Nodes Simulated: {}", self.stats.nodes_created.load(Ordering::Relaxed));
-        println!("Connections: {}", self.stats.connections_established.load(Ordering::Relaxed));
-        println!("Messages Generated: {}", self.stats.messages_sent.load(Ordering::Relaxed));
+        println!(
+            "Nodes Simulated: {}",
+            self.stats.nodes_created.load(Ordering::Relaxed)
+        );
+        println!(
+            "Connections: {}",
+            self.stats.connections_established.load(Ordering::Relaxed)
+        );
+        println!(
+            "Messages Generated: {}",
+            self.stats.messages_sent.load(Ordering::Relaxed)
+        );
         println!("Errors: {}", self.stats.errors.load(Ordering::Relaxed));
-        
+
         let total_nodes = self.stats.nodes_created.load(Ordering::Relaxed);
         if total_nodes > 0 {
-            let success_rate = ((total_nodes - self.stats.errors.load(Ordering::Relaxed)) as f64 / total_nodes as f64) * 100.0;
+            let success_rate = ((total_nodes - self.stats.errors.load(Ordering::Relaxed)) as f64
+                / total_nodes as f64)
+                * 100.0;
             println!("✓ Success Rate: {:.2}%", success_rate);
         }
-        
+
         println!("\nThis demonstrates SomaSync's ability to handle massive scale!");
         println!("For production: Real nodes would use clustering and connection pooling");
     }
@@ -306,18 +352,18 @@ fn create_sample_threat_data(id: usize) -> ThreatData {
 fn create_message_from_threat(threat: ThreatData) -> Message {
     let mut data = HashMap::new();
     data.insert("type".to_string(), "threat_intel".to_string());
-    data.insert("payload".to_string(), serde_json::to_string(&threat).unwrap());
-    
-    Message::new(
-        MessageType::Structured(data),
-        "threat-detector".to_string()
-    )
+    data.insert(
+        "payload".to_string(),
+        serde_json::to_string(&threat).unwrap(),
+    );
+
+    Message::new(MessageType::Structured(data), "threat-detector".to_string())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    
+
     let (nodes, duration, connections) = if args.len() > 1 {
         // Handle --preset flag format (e.g., "--preset large")
         let preset = if args.len() > 2 && args[1] == "--preset" {
@@ -326,10 +372,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Handle direct preset format (e.g., "large")
             Some(args[1].as_str())
         };
-        
+
         match preset {
             Some("small") => (1_000, 60, 500),
-            Some("medium") => (50_000, 180, 5_000), 
+            Some("medium") => (50_000, 180, 5_000),
             Some("large") => (500_000, 300, 15_000),
             Some("extreme") => (1_000_000, 600, 30_000),
             Some("million") => (1_000_000, 600, 25_000),
@@ -360,18 +406,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Nodes: {}", config.total_nodes);
     println!("   Duration: {} seconds", config.test_duration_secs);
     println!("   Max Connections: {}", config.max_concurrent_connections);
-    
+
     // Calculate estimated real nodes for this test
     let estimated_real_nodes = if config.total_nodes >= 500_000 {
         std::cmp::min(5000, config.max_concurrent_connections / 3)
     } else if config.total_nodes >= 50_000 {
-        std::cmp::min(1000, config.max_concurrent_connections / 5)  
+        std::cmp::min(1000, config.max_concurrent_connections / 5)
     } else {
         std::cmp::min(100, config.max_concurrent_connections / 10)
     };
     let estimated_memory_gb = (estimated_real_nodes * 3) as f64 / 1024.0;
-    
-    println!("   Real Nodes: {} (estimated {:.1}GB RAM)", estimated_real_nodes, estimated_memory_gb);
+
+    println!(
+        "   Real Nodes: {} (estimated {:.1}GB RAM)",
+        estimated_real_nodes, estimated_memory_gb
+    );
     println!();
 
     if nodes > 100_000 {

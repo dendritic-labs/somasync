@@ -1,7 +1,6 @@
-use somasync::{SynapseNodeBuilder, Peer, Message, MessageType};
-use serde_json;
+use somasync::{Message, MessageType, Peer, SynapseNodeBuilder};
 use std::collections::HashMap;
-use tokio::time::{sleep, Duration, timeout};
+use tokio::time::{sleep, timeout, Duration};
 
 #[tokio::test]
 async fn test_node_creation_and_basic_setup() {
@@ -19,7 +18,7 @@ async fn test_node_creation_and_basic_setup() {
     // Verify node IDs are set correctly
     assert_eq!(node1.node_id(), "test-node-1");
     assert_eq!(node2.node_id(), "test-node-2");
-    
+
     // Verify configuration
     assert_eq!(node1.config().bind_address.port(), 17001);
     assert_eq!(node2.config().bind_address.port(), 17002);
@@ -28,24 +27,36 @@ async fn test_node_creation_and_basic_setup() {
 #[tokio::test]
 async fn test_peer_management() {
     // Create nodes
-    let (mut node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
+    let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("peer-test-1".to_string())
         .with_bind_address("127.0.0.1:17003".parse().unwrap())
         .build();
 
-    let (mut node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
+    let (node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("peer-test-2".to_string())
         .with_bind_address("127.0.0.1:17004".parse().unwrap())
         .build();
 
     // Add peers to each other
-    let peer2 = Peer::new("peer-test-2".to_string(), "127.0.0.1:17004".parse().unwrap());
-    let peer1 = Peer::new("peer-test-1".to_string(), "127.0.0.1:17003".parse().unwrap());
+    let peer2 = Peer::new(
+        "peer-test-2".to_string(),
+        "127.0.0.1:17004".parse().unwrap(),
+    );
+    let peer1 = Peer::new(
+        "peer-test-1".to_string(),
+        "127.0.0.1:17003".parse().unwrap(),
+    );
 
     // Test adding peers (this tests the API works)
-    node1.add_peer(peer2).await.expect("Should add peer2 to node1");
-    node2.add_peer(peer1).await.expect("Should add peer1 to node2");
-    
+    node1
+        .add_peer(peer2)
+        .await
+        .expect("Should add peer2 to node1");
+    node2
+        .add_peer(peer1)
+        .await
+        .expect("Should add peer1 to node2");
+
     // If we get here without panicking, peer management works
 }
 
@@ -53,35 +64,35 @@ async fn test_peer_management() {
 async fn test_message_creation() {
     // Test various message types that SomaSync supports
     let data_msg = Message::new(
-        MessageType::Data("test payload".to_string()), 
-        "test-node".to_string()
+        MessageType::Data("test payload".to_string()),
+        "test-node".to_string(),
     );
     assert_eq!(data_msg.source, "test-node");
-    
+
     let mut params = HashMap::new();
     params.insert("target".to_string(), "service".to_string());
     let command_msg = Message::new(
-        MessageType::Command { 
-            action: "restart".to_string(), 
-            params 
+        MessageType::Command {
+            action: "restart".to_string(),
+            params,
         },
-        "control-node".to_string()
+        "control-node".to_string(),
     );
     assert_eq!(command_msg.source, "control-node");
-    
+
     let status_msg = Message::new(
-        MessageType::Status { 
-            component: "api".to_string(), 
-            state: "running".to_string() 
+        MessageType::Status {
+            component: "api".to_string(),
+            state: "running".to_string(),
         },
-        "status-node".to_string()
+        "status-node".to_string(),
     );
     assert_eq!(status_msg.source, "status-node");
 }
 
-#[tokio::test] 
+#[tokio::test]
 async fn test_threat_intel_message_structure() {
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct ThreatIntel {
@@ -93,35 +104,41 @@ async fn test_threat_intel_message_structure() {
     // Test that we can create messages suitable for threat intel sharing
     let threat_intel = ThreatIntel {
         threat_type: "brute_force".to_string(),
-        source_ip: "192.168.1.100".to_string(),  
+        source_ip: "192.168.1.100".to_string(),
         severity: 8,
     };
 
     let serialized = serde_json::to_string(&threat_intel).expect("Should serialize");
-    
+
     // Create message with binary payload (for threat intel)
     let binary_data = serialized.into_bytes();
     let threat_message = Message::new(
         MessageType::Binary(binary_data.clone()),
-        "security-node".to_string()
+        "security-node".to_string(),
     );
-    
-    // Verify message was created successfully  
+
+    // Verify message was created successfully
     assert_eq!(threat_message.source, "security-node");
-    assert_eq!(threat_message.message_type, MessageType::Binary(binary_data));
-    
+    assert_eq!(
+        threat_message.message_type,
+        MessageType::Binary(binary_data)
+    );
+
     // Test structured message approach
     let mut structured_data = HashMap::new();
     structured_data.insert("type".to_string(), "threat_intel".to_string());
     structured_data.insert("source_ip".to_string(), "192.168.1.100".to_string());
     structured_data.insert("severity".to_string(), "8".to_string());
-    
+
     let structured_msg = Message::new(
         MessageType::Structured(structured_data.clone()),
-        "threat-detector".to_string()
+        "threat-detector".to_string(),
     );
-    
-    assert_eq!(structured_msg.message_type, MessageType::Structured(structured_data));
+
+    assert_eq!(
+        structured_msg.message_type,
+        MessageType::Structured(structured_data)
+    );
 }
 
 #[tokio::test]
@@ -138,11 +155,23 @@ async fn test_direct_message_passing() {
         .build();
 
     // Set up peer relationships
-    let peer2 = Peer::new("receiver-node".to_string(), "127.0.0.1:17006".parse().unwrap());
-    let peer1 = Peer::new("sender-node".to_string(), "127.0.0.1:17005".parse().unwrap());
+    let peer2 = Peer::new(
+        "receiver-node".to_string(),
+        "127.0.0.1:17006".parse().unwrap(),
+    );
+    let peer1 = Peer::new(
+        "sender-node".to_string(),
+        "127.0.0.1:17005".parse().unwrap(),
+    );
 
-    node1.add_peer(peer2).await.expect("Should add peer2 to node1");
-    node2.add_peer(peer1).await.expect("Should add peer1 to node2");
+    node1
+        .add_peer(peer2)
+        .await
+        .expect("Should add peer2 to node1");
+    node2
+        .add_peer(peer1)
+        .await
+        .expect("Should add peer1 to node2");
 
     // Start both nodes
     let node1_handle = tokio::spawn(async move {
@@ -181,14 +210,17 @@ async fn test_direct_message_passing() {
     // Wait for handlers to complete
     let received_messages = msg_handler.await.expect("Message handler should complete");
     let received_events = event_handler.await.expect("Event handler should complete");
-    
+
     // Clean shutdown
     node1_handle.abort();
     node2_handle.abort();
-    
+
     // Verify the infrastructure works (nodes started and can exchange events)
-    println!("Direct messaging test: {} messages, {} events received", 
-             received_messages.len(), received_events.len());
+    println!(
+        "Direct messaging test: {} messages, {} events received",
+        received_messages.len(),
+        received_events.len()
+    );
 }
 
 #[tokio::test]
@@ -210,27 +242,63 @@ async fn test_three_node_gossip_propagation() {
         .build();
 
     // Create full mesh connections: A->B, B->C, C->A
-    node_a.add_peer(Peer::new("node-b".to_string(), "127.0.0.1:17008".parse().unwrap())).await.expect("A should connect to B");
-    node_b.add_peer(Peer::new("node-c".to_string(), "127.0.0.1:17009".parse().unwrap())).await.expect("B should connect to C");
-    node_c.add_peer(Peer::new("node-a".to_string(), "127.0.0.1:17007".parse().unwrap())).await.expect("C should connect to A");
-    
+    node_a
+        .add_peer(Peer::new(
+            "node-b".to_string(),
+            "127.0.0.1:17008".parse().unwrap(),
+        ))
+        .await
+        .expect("A should connect to B");
+    node_b
+        .add_peer(Peer::new(
+            "node-c".to_string(),
+            "127.0.0.1:17009".parse().unwrap(),
+        ))
+        .await
+        .expect("B should connect to C");
+    node_c
+        .add_peer(Peer::new(
+            "node-a".to_string(),
+            "127.0.0.1:17007".parse().unwrap(),
+        ))
+        .await
+        .expect("C should connect to A");
+
     // Also add reverse connections for full mesh
-    node_b.add_peer(Peer::new("node-a".to_string(), "127.0.0.1:17007".parse().unwrap())).await.expect("B should connect to A");
-    node_c.add_peer(Peer::new("node-b".to_string(), "127.0.0.1:17008".parse().unwrap())).await.expect("C should connect to B");
-    node_a.add_peer(Peer::new("node-c".to_string(), "127.0.0.1:17009".parse().unwrap())).await.expect("A should connect to C");
+    node_b
+        .add_peer(Peer::new(
+            "node-a".to_string(),
+            "127.0.0.1:17007".parse().unwrap(),
+        ))
+        .await
+        .expect("B should connect to A");
+    node_c
+        .add_peer(Peer::new(
+            "node-b".to_string(),
+            "127.0.0.1:17008".parse().unwrap(),
+        ))
+        .await
+        .expect("C should connect to B");
+    node_a
+        .add_peer(Peer::new(
+            "node-c".to_string(),
+            "127.0.0.1:17009".parse().unwrap(),
+        ))
+        .await
+        .expect("A should connect to C");
 
     // Start all nodes
-    let handle_a = tokio::spawn(async move { 
+    let handle_a = tokio::spawn(async move {
         if let Err(e) = node_a.start().await {
             eprintln!("Node A error: {}", e);
         }
     });
-    let handle_b = tokio::spawn(async move { 
+    let handle_b = tokio::spawn(async move {
         if let Err(e) = node_b.start().await {
             eprintln!("Node B error: {}", e);
         }
     });
-    let handle_c = tokio::spawn(async move { 
+    let handle_c = tokio::spawn(async move {
         if let Err(e) = node_c.start().await {
             eprintln!("Node C error: {}", e);
         }
@@ -288,16 +356,18 @@ async fn test_three_node_gossip_propagation() {
     handle_c.abort();
 
     // Verify mesh formation worked (nodes communicated)
-    println!("Gossip test: A={}, B={}, C={} messages, {} events", 
-             count_a, count_b, count_c, events);
-    
+    println!(
+        "Gossip test: A={}, B={}, C={} messages, {} events",
+        count_a, count_b, count_c, events
+    );
+
     // The fact that we got here without panics means the mesh infrastructure works
-    assert!(true, "Mesh network formation test completed successfully");
+    println!("Mesh network formation test completed successfully");
 }
 
 #[tokio::test]
 async fn test_threat_intel_message_flow() {
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct ThreatIntel {
@@ -319,16 +389,28 @@ async fn test_threat_intel_message_flow() {
         .build();
 
     // Connect security nodes
-    security_node_1.add_peer(Peer::new("security-detector-2".to_string(), "127.0.0.1:17011".parse().unwrap())).await.expect("Security nodes should connect");
-    security_node_2.add_peer(Peer::new("security-detector-1".to_string(), "127.0.0.1:17010".parse().unwrap())).await.expect("Security nodes should connect");
+    security_node_1
+        .add_peer(Peer::new(
+            "security-detector-2".to_string(),
+            "127.0.0.1:17011".parse().unwrap(),
+        ))
+        .await
+        .expect("Security nodes should connect");
+    security_node_2
+        .add_peer(Peer::new(
+            "security-detector-1".to_string(),
+            "127.0.0.1:17010".parse().unwrap(),
+        ))
+        .await
+        .expect("Security nodes should connect");
 
     // Start nodes
-    let handle_1 = tokio::spawn(async move { 
+    let handle_1 = tokio::spawn(async move {
         if let Err(e) = security_node_1.start().await {
             eprintln!("Security node 1 error: {}", e);
         }
     });
-    let handle_2 = tokio::spawn(async move { 
+    let handle_2 = tokio::spawn(async move {
         if let Err(e) = security_node_2.start().await {
             eprintln!("Security node 2 error: {}", e);
         }
@@ -348,16 +430,22 @@ async fn test_threat_intel_message_flow() {
     // Serialize as structured message
     let mut threat_data = HashMap::new();
     threat_data.insert("type".to_string(), "threat_intel".to_string());
-    threat_data.insert("payload".to_string(), serde_json::to_string(&threat_intel).unwrap());
-    
+    threat_data.insert(
+        "payload".to_string(),
+        serde_json::to_string(&threat_intel).unwrap(),
+    );
+
     let threat_message = Message::new(
         MessageType::Structured(threat_data),
-        "security-detector-1".to_string()
+        "security-detector-1".to_string(),
     );
 
     // Verify message structure is correct for threat sharing
     assert_eq!(threat_message.source, "security-detector-1");
-    assert!(matches!(threat_message.message_type, MessageType::Structured(_)));
+    assert!(matches!(
+        threat_message.message_type,
+        MessageType::Structured(_)
+    ));
 
     // Set up receiver to catch any messages
     let message_receiver = tokio::spawn(async move {
@@ -380,17 +468,24 @@ async fn test_threat_intel_message_flow() {
     // Wait for message processing
     sleep(Duration::from_millis(400)).await;
 
-    let received_messages = message_receiver.await.expect("Message receiver should complete");
-    let received_events = event_receiver.await.expect("Event receiver should complete");
+    let received_messages = message_receiver
+        .await
+        .expect("Message receiver should complete");
+    let received_events = event_receiver
+        .await
+        .expect("Event receiver should complete");
 
     // Clean shutdown
     handle_1.abort();
     handle_2.abort();
 
     // Verify threat intel infrastructure is ready
-    println!("Threat intel test: {} messages, {} events. Message structure validated.", 
-             received_messages.len(), received_events.len());
-    
+    println!(
+        "Threat intel test: {} messages, {} events. Message structure validated.",
+        received_messages.len(),
+        received_events.len()
+    );
+
     // Test that our threat intel message structure is ready
     assert_eq!(threat_message.source, "security-detector-1");
 }
