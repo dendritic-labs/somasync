@@ -3,7 +3,7 @@
 //! This module defines the core message types used for communication
 //! across the neural mesh network.
 
-use ed25519_dalek::{Keypair, PublicKey, Signature, Signer, Verifier};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -49,7 +49,7 @@ pub struct MessageSignature {
 
 impl MessageSignature {
     /// Create a new Ed25519 signature
-    pub fn new_ed25519(signature: Signature, public_key: PublicKey) -> Self {
+    pub fn new_ed25519(signature: Signature, public_key: VerifyingKey) -> Self {
         let signed_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -80,7 +80,7 @@ impl MessageSignature {
         let public_key_bytes: [u8; 32] = self.public_key.as_slice().try_into().map_err(|_| {
             crate::error::SynapseError::Security("Invalid public key length".to_string())
         })?;
-        let public_key = PublicKey::from_bytes(&public_key_bytes).map_err(|e| {
+        let public_key = VerifyingKey::from_bytes(&public_key_bytes).map_err(|e| {
             crate::error::SynapseError::Security(format!("Invalid public key: {}", e))
         })?;
 
@@ -88,7 +88,7 @@ impl MessageSignature {
         let signature_bytes: [u8; 64] = self.signature.as_slice().try_into().map_err(|_| {
             crate::error::SynapseError::Security("Invalid signature length".to_string())
         })?;
-        let signature = Signature::from_bytes(&signature_bytes).map_err(|e| {
+        let signature = Signature::try_from(signature_bytes.as_slice()).map_err(|e| {
             crate::error::SynapseError::Security(format!("Invalid signature: {}", e))
         })?;
 
@@ -176,10 +176,10 @@ impl Message {
     }
 
     /// Sign the message with Ed25519 for integrity verification
-    pub fn sign_with_ed25519(mut self, keypair: &Keypair) -> Self {
+    pub fn sign_with_ed25519(mut self, signing_key: &SigningKey) -> Self {
         let message_content = self.get_signable_content();
-        let signature = keypair.sign(&message_content);
-        let public_key = keypair.public;
+        let signature = signing_key.sign(&message_content);
+        let public_key = signing_key.verifying_key();
 
         self.signature = Some(MessageSignature::new_ed25519(signature, public_key));
         self
@@ -704,17 +704,20 @@ mod tests {
 
     #[test]
     fn test_message_signing() {
-        use rand::rngs::OsRng as RandOsRng;
+        use rand::RngCore;
 
-        // Generate a keypair
-        let keypair = Keypair::generate(&mut RandOsRng);
+        // Generate a signing key
+        let mut csprng = rand::rngs::OsRng;
+        let mut secret_bytes = [0u8; 32];
+        csprng.fill_bytes(&mut secret_bytes);
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
 
         // Create and sign a message
         let msg = Message::new(
             MessageType::Data("sensitive threat intel".to_string()),
             "threat-detector-1".to_string(),
         )
-        .sign_with_ed25519(&keypair);
+        .sign_with_ed25519(&signing_key);
 
         // Verify the message is signed
         assert!(msg.is_signed());
@@ -726,17 +729,20 @@ mod tests {
 
     #[test]
     fn test_message_signature_verification_fails_on_tampered_content() {
-        use rand::rngs::OsRng as RandOsRng;
+        use rand::RngCore;
 
-        // Generate a keypair
-        let keypair = Keypair::generate(&mut RandOsRng);
+        // Generate a signing key
+        let mut csprng = rand::rngs::OsRng;
+        let mut secret_bytes = [0u8; 32];
+        csprng.fill_bytes(&mut secret_bytes);
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
 
         // Create and sign a message
         let mut msg = Message::new(
             MessageType::Data("original content".to_string()),
             "node1".to_string(),
         )
-        .sign_with_ed25519(&keypair);
+        .sign_with_ed25519(&signing_key);
 
         // Tamper with the message content after signing
         msg.message_type = MessageType::Data("tampered content".to_string());

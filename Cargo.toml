@@ -29,7 +29,8 @@ url = "2.0"
 futures = "0.3"
 async-trait = "0.1"
 # Message signing and verification for enterprise security
-ed25519-dalek = { version = "1.0", features = ["serde"] }
+# Using v2.x which fixes RUSTSEC-2022-0093 (Double Public Key Signing vulnerability)
+ed25519-dalek = { version = "2.1", features = ["serde"] }
 # Rate limiting and DoS protection
 governor = "0.6"
 # Metrics and monitoring

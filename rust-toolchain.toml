@@ -1,0 +1,6 @@
+[toolchain]
+channel = "stable"
+# Using stable Rust that supports edition 2024 and modern crypto dependencies
+# This ensures we can use secure versions of ed25519-dalek and curve25519-dalek
+profile = "default"
+components = ["clippy", "rustfmt"]

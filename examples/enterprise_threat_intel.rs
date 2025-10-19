@@ -11,8 +11,8 @@
 //! - Bandwidth throttling for enterprise networks
 //! - Network statistics monitoring
 
-use ed25519_dalek::Keypair;
-use rand::rngs::OsRng as RandOsRng;
+use ed25519_dalek::SigningKey;
+use rand::rngs::OsRng;
 use somasync::{EnterpriseGossipConfig, GossipProtocol, Message, MessageType, Peer};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -23,7 +23,7 @@ use tokio::time::{sleep, Duration};
 struct SecurityNode {
     name: String,
     gossip_protocol: GossipProtocol,
-    signing_key: Keypair,
+    signing_key: SigningKey,
     threat_message_rx: mpsc::UnboundedReceiver<Message>,
     _outbound_rx: mpsc::UnboundedReceiver<(std::net::SocketAddr, somasync::MessageEnvelope)>,
 }
@@ -34,7 +34,10 @@ impl SecurityNode {
         let (threat_tx, threat_rx) = mpsc::unbounded_channel();
 
         // Generate signing key for threat intel authenticity
-        let signing_key = Keypair::generate(&mut RandOsRng);
+        let mut csprng = OsRng;
+        let mut secret_bytes = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut csprng, &mut secret_bytes);
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
 
         // Configure enterprise gossip for threat intelligence
         let enterprise_config = EnterpriseGossipConfig::for_threat_intel();
@@ -75,7 +78,10 @@ impl SecurityNode {
     async fn new_basic_node(name: String, node_id: String, _bind_port: u16) -> Self {
         let (threat_tx, threat_rx) = mpsc::unbounded_channel();
 
-        let signing_key = Keypair::generate(&mut RandOsRng);
+        let mut csprng = OsRng;
+        let mut secret_bytes = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut csprng, &mut secret_bytes);
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
 
         // Use basic gossip configuration
         let basic_config = somasync::GossipConfig::default();
