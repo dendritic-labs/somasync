@@ -54,6 +54,62 @@ impl Default for SynapseConfig {
     }
 }
 
+impl SynapseConfig {
+    /// Validate the configuration
+    pub fn validate(&self) -> Result<(), crate::error::SynapseError> {
+        // Validate node_id if provided
+        if let Some(ref node_id) = self.node_id {
+            if node_id.is_empty() {
+                return Err(crate::error::SynapseError::config(
+                    "Node ID cannot be empty",
+                ));
+            }
+            if node_id.len() > 64 {
+                return Err(crate::error::SynapseError::config(
+                    "Node ID cannot exceed 64 characters",
+                ));
+            }
+            // Check for valid characters (alphanumeric, dash, underscore)
+            if !node_id
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            {
+                return Err(crate::error::SynapseError::config(
+                    "Node ID can only contain alphanumeric characters, dashes, and underscores",
+                ));
+            }
+        }
+
+        // Validate message buffer size
+        if self.message_buffer_size == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Message buffer size must be greater than 0",
+            ));
+        }
+        if self.message_buffer_size > 100_000 {
+            return Err(crate::error::SynapseError::config(
+                "Message buffer size cannot exceed 100,000 for memory safety",
+            ));
+        }
+
+        // Validate network interface name if provided
+        if let Some(ref interface) = self.interface {
+            if interface.is_empty() {
+                return Err(crate::error::SynapseError::config(
+                    "Network interface name cannot be empty",
+                ));
+            }
+        }
+
+        // Validate nested configurations
+        self.gossip.validate()?;
+        self.mesh.validate()?;
+        self.discovery.validate()?;
+
+        Ok(())
+    }
+}
+
 /// Statistics for the entire Synapse node
 #[derive(Debug, Clone)]
 pub struct SynapseStats {
@@ -536,12 +592,17 @@ impl SynapseNodeBuilder {
     /// Build the Synapse node
     pub fn build(
         self,
-    ) -> (
-        SynapseNode,
-        mpsc::UnboundedReceiver<Message>,
-        mpsc::UnboundedReceiver<SynapseEvent>,
-    ) {
-        SynapseNode::new(self.config)
+    ) -> Result<
+        (
+            SynapseNode,
+            mpsc::UnboundedReceiver<Message>,
+            mpsc::UnboundedReceiver<SynapseEvent>,
+        ),
+        crate::error::SynapseError,
+    > {
+        // Validate configuration before building
+        self.config.validate()?;
+        Ok(SynapseNode::new(self.config))
     }
 }
 
@@ -560,7 +621,8 @@ mod tests {
     async fn test_node_creation() {
         let (node, _msg_rx, _event_rx) = SynapseNodeBuilder::new()
             .with_node_id("test-node".to_string())
-            .build();
+            .build()
+            .unwrap();
 
         assert_eq!(node.node_id(), "test-node");
         assert_eq!(node.config().bind_address, "0.0.0.0:0".parse().unwrap());
@@ -576,7 +638,8 @@ mod tests {
             .with_bind_address(addr)
             .add_bootstrap_peer(bootstrap_addr)
             .with_auto_discovery(false)
-            .build();
+            .build()
+            .unwrap();
 
         assert_eq!(node.node_id(), "builder-test");
         assert_eq!(node.config().bind_address, addr);
@@ -592,7 +655,8 @@ mod tests {
     async fn test_node_stats() {
         let (node, _msg_rx, _event_rx) = SynapseNodeBuilder::new()
             .with_node_id("stats-test".to_string())
-            .build();
+            .build()
+            .unwrap();
 
         let stats = node.get_stats().await;
         assert_eq!(stats.node_id, "stats-test");
@@ -604,7 +668,8 @@ mod tests {
     async fn test_add_peer() {
         let (node, _msg_rx, _event_rx) = SynapseNodeBuilder::new()
             .with_node_id("peer-test".to_string())
-            .build();
+            .build()
+            .unwrap();
 
         let addr = SocketAddr::from_str("127.0.0.1:9090").unwrap();
         let mut peer = Peer::new("test-peer".to_string(), addr);

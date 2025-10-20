@@ -15,14 +15,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut node1, mut msg_rx1, mut event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("node-1".to_string())
         .with_bind_address("127.0.0.1:8080".parse()?)
-        .build();
+        .build()?;
 
     // Create second node
     let (mut node2, mut msg_rx2, mut event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("node-2".to_string())
         .with_bind_address("127.0.0.1:8081".parse()?)
         .add_bootstrap_peer("127.0.0.1:8080".parse()?)
-        .build();
+        .build()?;
 
     info!("Created nodes: {} and {}", node1.node_id(), node2.node_id());
 

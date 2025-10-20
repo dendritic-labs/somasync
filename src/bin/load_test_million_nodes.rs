@@ -223,7 +223,8 @@ impl MillionNodeLoadTest {
                 let (node, _msg_rx, _event_rx) = SynapseNodeBuilder::new()
                     .with_node_id(node_id.clone())
                     .with_bind_address(format!("127.0.0.1:{}", port).parse().unwrap())
-                    .build();
+                    .build()
+                    .unwrap();
 
                 // Simulate some connections
                 if i > 0 {

@@ -24,7 +24,7 @@
 //!     // Create and configure a new node
 //!     let (mut node, _message_rx, _event_rx) = SynapseNodeBuilder::new()
 //!         .with_node_id("node-1".to_string())
-//!         .build();
+//!         .build()?;
 //!     
 //!     // Start the node
 //!     node.start().await?;

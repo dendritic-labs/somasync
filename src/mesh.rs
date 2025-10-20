@@ -52,6 +52,83 @@ impl Default for MeshConfig {
     }
 }
 
+impl MeshConfig {
+    /// Validate the mesh configuration
+    pub fn validate(&self) -> Result<(), crate::error::SynapseError> {
+        // Validate connection limits
+        if self.max_connections == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum connections must be greater than 0",
+            ));
+        }
+        if self.max_connections > 1000 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum connections cannot exceed 1000 for performance reasons",
+            ));
+        }
+
+        if self.min_connections == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Minimum connections must be greater than 0",
+            ));
+        }
+        if self.min_connections > self.max_connections {
+            return Err(crate::error::SynapseError::config(
+                "Minimum connections cannot exceed maximum connections",
+            ));
+        }
+
+        // Validate timeouts and intervals
+        if self.route_timeout < Duration::from_millis(100) {
+            return Err(crate::error::SynapseError::config(
+                "Route timeout cannot be less than 100ms",
+            ));
+        }
+        if self.route_timeout > Duration::from_secs(300) {
+            return Err(crate::error::SynapseError::config(
+                "Route timeout cannot exceed 5 minutes",
+            ));
+        }
+
+        if self.route_cache_ttl < Duration::from_secs(10) {
+            return Err(crate::error::SynapseError::config(
+                "Route cache TTL cannot be less than 10 seconds",
+            ));
+        }
+
+        if self.health_check_interval < Duration::from_secs(1) {
+            return Err(crate::error::SynapseError::config(
+                "Health check interval cannot be less than 1 second",
+            ));
+        }
+        if self.health_check_interval > Duration::from_secs(3600) {
+            return Err(crate::error::SynapseError::config(
+                "Health check interval cannot exceed 1 hour",
+            ));
+        }
+
+        if self.topology_update_interval < Duration::from_secs(5) {
+            return Err(crate::error::SynapseError::config(
+                "Topology update interval cannot be less than 5 seconds",
+            ));
+        }
+
+        // Validate route hops
+        if self.max_route_hops == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum route hops must be greater than 0",
+            ));
+        }
+        if self.max_route_hops > 20 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum route hops cannot exceed 20 to prevent infinite loops",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 /// Network route information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Route {
