@@ -78,7 +78,7 @@ impl Route {
     pub fn new(destination: String, next_hop: String, hop_count: u8, cost: u32) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         Self {
@@ -97,7 +97,7 @@ impl Route {
     pub fn is_expired(&self, ttl: Duration) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         now - self.created_at > ttl.as_secs()
@@ -107,7 +107,7 @@ impl Route {
     pub fn mark_used(&mut self) {
         self.last_used = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
     }
 
@@ -233,7 +233,7 @@ impl MeshNetwork {
             version: 0,
             updated_at: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         };
 
@@ -420,7 +420,7 @@ impl MeshNetwork {
                     node_id: self.node_id.clone(),
                     timestamp: SystemTime::now()
                         .duration_since(UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_secs(),
                     sequence,
                     original_timestamp: timestamp,
@@ -437,7 +437,7 @@ impl MeshNetwork {
             } => {
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs();
                 let latency = now - original_timestamp;
 
@@ -474,7 +474,7 @@ impl MeshNetwork {
             let mut pending = self.pending_discoveries.write().await;
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs();
             pending.insert(target.to_string(), (self.node_id.clone(), now));
         }
@@ -486,7 +486,7 @@ impl MeshNetwork {
             trace: vec![self.node_id.clone()],
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         };
 
@@ -567,7 +567,7 @@ impl MeshNetwork {
             topology.version = version;
             topology.updated_at = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs();
 
             debug!("Updated topology to version {}", version);
@@ -612,7 +612,9 @@ impl MeshNetwork {
 
             let node_info = NodeInfo {
                 id: self.node_id.clone(),
-                address: "127.0.0.1:0".parse().unwrap(), // This should be our actual address
+                address: "127.0.0.1:0"
+                    .parse()
+                    .unwrap_or_else(|_| ([127, 0, 0, 1], 0).into()), // This should be our actual address
                 capabilities: HashSet::new(),
                 load: 50,  // This should be calculated based on actual load
                 uptime: 0, // This should be actual uptime
@@ -654,7 +656,7 @@ impl MeshNetwork {
                 node_id: self.node_id.clone(),
                 timestamp: SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs(),
                 sequence,
             };
