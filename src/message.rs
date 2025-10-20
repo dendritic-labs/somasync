@@ -1,6 +1,10 @@
 //! Message types and serialization for distributed communication
 //!
 //! This module defines the core message types used for communication
+//! across the neural mesh     pub fn add_header(mut self, key: String, value: String) -> Self {
+//! Message types and serialization for distributed communication
+//!
+//! This module defines the core message types used for communication
 //! across the neural mesh network.
 
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
@@ -130,7 +134,6 @@ pub struct Message {
 }
 
 impl Message {
-    /// Create a new message
     pub fn new(message_type: MessageType, source: String) -> Self {
         let id = Self::generate_id(&message_type, &source);
         let timestamp = SystemTime::now()
@@ -151,19 +154,16 @@ impl Message {
         }
     }
 
-    /// Create a new message with custom TTL
     pub fn with_ttl(mut self, ttl_seconds: u64) -> Self {
         self.ttl = ttl_seconds;
         self
     }
 
-    /// Create a new message with priority
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority;
         self
     }
 
-    /// Create a new message with correlation ID
     pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
         self.correlation_id = Some(correlation_id);
         self
@@ -225,7 +225,7 @@ impl Message {
         now > self.timestamp + self.ttl
     }
 
-    /// Get message age in seconds
+    /// Returns the age of this message in seconds since creation
     pub fn age(&self) -> u64 {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -235,7 +235,7 @@ impl Message {
         now.saturating_sub(self.timestamp)
     }
 
-    /// Get remaining TTL in seconds
+    /// Returns how many seconds remain before this message expires
     pub fn remaining_ttl(&self) -> u64 {
         if self.is_expired() {
             0

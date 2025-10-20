@@ -1,8 +1,8 @@
-//! Error types for the Synapse mesh networking library
+//! Error types for the SomaSync mesh networking library
 
 use thiserror::Error;
 
-/// Main error type for Synapse operations
+/// Main error type for SomaSync operations
 #[derive(Error, Debug)]
 pub enum SynapseError {
     /// Network-related errors
@@ -43,7 +43,6 @@ pub enum SynapseError {
 }
 
 impl SynapseError {
-    /// Create a network error
     pub fn network(message: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self::Network {
             message: message.into(),
@@ -51,7 +50,6 @@ impl SynapseError {
         }
     }
 
-    /// Create a peer error
     pub fn peer(message: impl Into<String>, peer_id: impl Into<String>) -> Self {
         Self::Peer {
             message: message.into(),
@@ -59,28 +57,24 @@ impl SynapseError {
         }
     }
 
-    /// Create a message error
     pub fn message(message: impl Into<String>) -> Self {
         Self::Message {
             message: message.into(),
         }
     }
 
-    /// Create a configuration error
     pub fn config(message: impl Into<String>) -> Self {
         Self::Config {
             message: message.into(),
         }
     }
 
-    /// Create a gossip protocol error
     pub fn gossip(message: impl Into<String>) -> Self {
         Self::Gossip {
             message: message.into(),
         }
     }
 
-    /// Create a security error
     pub fn security(message: impl Into<String>) -> Self {
         Self::Security(message.into())
     }
