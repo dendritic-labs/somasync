@@ -202,6 +202,8 @@ pub enum MeshMessage {
 pub struct MeshNetwork {
     /// Our node identifier
     node_id: String,
+    /// Local bind address for this node
+    bind_address: SocketAddr,
     /// Mesh configuration
     config: MeshConfig,
     /// Peer manager for connection handling
@@ -222,6 +224,7 @@ impl MeshNetwork {
     /// Create a new mesh network
     pub fn new(
         node_id: String,
+        bind_address: SocketAddr,
         config: MeshConfig,
         peer_manager: Arc<PeerManager>,
     ) -> (Self, mpsc::UnboundedReceiver<(String, MeshMessage)>) {
@@ -239,6 +242,7 @@ impl MeshNetwork {
 
         let mesh = Self {
             node_id,
+            bind_address,
             config,
             peer_manager,
             routing_table: Arc::new(RwLock::new(HashMap::new())),
@@ -612,9 +616,7 @@ impl MeshNetwork {
 
             let node_info = NodeInfo {
                 id: self.node_id.clone(),
-                address: "127.0.0.1:0"
-                    .parse()
-                    .unwrap_or_else(|_| ([127, 0, 0, 1], 0).into()), // This should be our actual address
+                address: self.bind_address,
                 capabilities: HashSet::new(),
                 load: 50,  // This should be calculated based on actual load
                 uptime: 0, // This should be actual uptime
@@ -771,7 +773,9 @@ mod tests {
         let peer_config = DiscoveryConfig::default();
         let peer_manager = Arc::new(PeerManager::new("test".to_string(), peer_config));
 
-        let (mesh, _rx) = MeshNetwork::new("test-node".to_string(), config, peer_manager);
+        let bind_addr = "127.0.0.1:0".parse().unwrap();
+        let (mesh, _rx) =
+            MeshNetwork::new("test-node".to_string(), bind_addr, config, peer_manager);
 
         let stats = mesh.get_stats().await;
         assert_eq!(stats.routes_cached, 0);

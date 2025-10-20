@@ -41,9 +41,9 @@ impl Default for SynapseConfig {
     fn default() -> Self {
         Self {
             node_id: None,
-            bind_address: "127.0.0.1:0"
+            bind_address: "0.0.0.0:0"
                 .parse()
-                .unwrap_or_else(|_| ([127, 0, 0, 1], 0).into()),
+                .unwrap_or_else(|_| ([0, 0, 0, 0], 0).into()),
             gossip: GossipConfig::default(),
             mesh: MeshConfig::default(),
             discovery: DiscoveryConfig::default(),
@@ -208,6 +208,7 @@ impl SynapseNode {
         // Initialize mesh network
         let (mesh, _mesh_outbound_rx) = MeshNetwork::new(
             self.node_id.clone(),
+            self.config.bind_address,
             self.config.mesh.clone(),
             Arc::clone(&self.peer_manager),
         );
@@ -562,7 +563,7 @@ mod tests {
             .build();
 
         assert_eq!(node.node_id(), "test-node");
-        assert_eq!(node.config().bind_address, "127.0.0.1:0".parse().unwrap());
+        assert_eq!(node.config().bind_address, "0.0.0.0:0".parse().unwrap());
     }
 
     #[tokio::test]
