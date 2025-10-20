@@ -207,9 +207,7 @@ pub struct DiscoveryConfig {
 impl Default for DiscoveryConfig {
     fn default() -> Self {
         Self {
-            methods: vec![DiscoveryMethod::Bootstrap, DiscoveryMethod::Gossip]
-                .into_iter()
-                .collect(),
+            methods: vec![DiscoveryMethod::Gossip].into_iter().collect(),
             bootstrap_peers: Vec::new(),
             discovery_interval: Duration::from_secs(60),
             max_peers: 50,
@@ -217,6 +215,93 @@ impl Default for DiscoveryConfig {
             validation_timeout: Duration::from_secs(10),
             local_port_range: None,
         }
+    }
+}
+
+impl DiscoveryConfig {
+    /// Validate the discovery configuration
+    pub fn validate(&self) -> Result<(), crate::error::SynapseError> {
+        // Validate peer limits
+        if self.max_peers == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum peers must be greater than 0",
+            ));
+        }
+        if self.max_peers > 10000 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum peers cannot exceed 10,000 for performance reasons",
+            ));
+        }
+
+        if self.min_peers == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Minimum peers must be greater than 0",
+            ));
+        }
+        if self.min_peers > self.max_peers {
+            return Err(crate::error::SynapseError::config(
+                "Minimum peers cannot exceed maximum peers",
+            ));
+        }
+
+        // Validate discovery interval
+        if self.discovery_interval < Duration::from_secs(5) {
+            return Err(crate::error::SynapseError::config(
+                "Discovery interval cannot be less than 5 seconds",
+            ));
+        }
+        if self.discovery_interval > Duration::from_secs(3600) {
+            return Err(crate::error::SynapseError::config(
+                "Discovery interval cannot exceed 1 hour",
+            ));
+        }
+
+        // Validate validation timeout
+        if self.validation_timeout < Duration::from_millis(100) {
+            return Err(crate::error::SynapseError::config(
+                "Validation timeout cannot be less than 100ms",
+            ));
+        }
+        if self.validation_timeout > Duration::from_secs(60) {
+            return Err(crate::error::SynapseError::config(
+                "Validation timeout cannot exceed 1 minute",
+            ));
+        }
+
+        // Validate discovery methods
+        if self.methods.is_empty() {
+            return Err(crate::error::SynapseError::config(
+                "At least one discovery method must be enabled",
+            ));
+        }
+
+        // Validate port range if specified
+        if let Some((start, end)) = self.local_port_range {
+            if start == 0 || end == 0 {
+                return Err(crate::error::SynapseError::config(
+                    "Port range cannot include port 0",
+                ));
+            }
+            if start > end {
+                return Err(crate::error::SynapseError::config(
+                    "Port range start cannot be greater than end",
+                ));
+            }
+            if end - start < 10 {
+                return Err(crate::error::SynapseError::config(
+                    "Port range must include at least 10 ports",
+                ));
+            }
+        }
+
+        // If using bootstrap discovery, ensure bootstrap peers are provided
+        if self.methods.contains(&DiscoveryMethod::Bootstrap) && self.bootstrap_peers.is_empty() {
+            return Err(crate::error::SynapseError::config(
+                "Bootstrap discovery method requires at least one bootstrap peer",
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -610,9 +695,35 @@ mod tests {
     #[test]
     fn test_discovery_config() {
         let config = DiscoveryConfig::default();
-        assert!(config.methods.contains(&DiscoveryMethod::Bootstrap));
         assert!(config.methods.contains(&DiscoveryMethod::Gossip));
         assert_eq!(config.max_peers, 50);
         assert_eq!(config.min_peers, 3);
+    }
+
+    #[test]
+    fn test_discovery_config_validation() {
+        // Valid config should pass
+        let valid_config = DiscoveryConfig::default();
+        assert!(valid_config.validate().is_ok());
+
+        // Invalid: min_peers > max_peers
+        let invalid_config = DiscoveryConfig {
+            min_peers: 100,
+            max_peers: 50,
+            ..Default::default()
+        };
+        assert!(invalid_config.validate().is_err());
+
+        // Invalid: bootstrap method without bootstrap peers
+        let mut bootstrap_config = DiscoveryConfig::default();
+        bootstrap_config.methods.insert(DiscoveryMethod::Bootstrap);
+        bootstrap_config.bootstrap_peers = Vec::new();
+        assert!(bootstrap_config.validate().is_err());
+
+        // Valid: bootstrap method with bootstrap peers
+        bootstrap_config
+            .bootstrap_peers
+            .push("127.0.0.1:8080".parse().unwrap());
+        assert!(bootstrap_config.validate().is_ok());
     }
 }

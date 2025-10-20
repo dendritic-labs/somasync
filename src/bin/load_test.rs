@@ -158,7 +158,8 @@ impl MillionNodeLoadTest {
                     let (node, mut _msg_rx, mut _event_rx) = SynapseNodeBuilder::new()
                         .with_node_id(node_id.clone())
                         .with_bind_address(format!("127.0.0.1:{}", port).parse().unwrap())
-                        .build();
+                        .build()
+                        .unwrap();
 
                     // Add peer connections to create a realistic network topology
                     let connections_per_node = i.clamp(1, 5);

@@ -72,6 +72,79 @@ impl Default for GossipConfig {
     }
 }
 
+impl GossipConfig {
+    /// Validate the gossip configuration
+    pub fn validate(&self) -> Result<(), crate::error::SynapseError> {
+        // Validate fanout
+        if self.fanout == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Gossip fanout must be greater than 0",
+            ));
+        }
+        if self.fanout > 100 {
+            return Err(crate::error::SynapseError::config(
+                "Gossip fanout cannot exceed 100 for network efficiency",
+            ));
+        }
+
+        // Validate intervals
+        if self.gossip_interval < Duration::from_millis(100) {
+            return Err(crate::error::SynapseError::config(
+                "Gossip interval cannot be less than 100ms",
+            ));
+        }
+        if self.gossip_interval > Duration::from_secs(3600) {
+            return Err(crate::error::SynapseError::config(
+                "Gossip interval cannot exceed 1 hour",
+            ));
+        }
+
+        if self.sync_interval < Duration::from_secs(10) {
+            return Err(crate::error::SynapseError::config(
+                "Sync interval cannot be less than 10 seconds",
+            ));
+        }
+
+        // Validate message limits
+        if self.max_stored_messages == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum stored messages must be greater than 0",
+            ));
+        }
+        if self.max_stored_messages > 1_000_000 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum stored messages cannot exceed 1,000,000 for memory safety",
+            ));
+        }
+
+        // Validate timeouts
+        if self.network_timeout < Duration::from_millis(100) {
+            return Err(crate::error::SynapseError::config(
+                "Network timeout cannot be less than 100ms",
+            ));
+        }
+        if self.network_timeout > Duration::from_secs(300) {
+            return Err(crate::error::SynapseError::config(
+                "Network timeout cannot exceed 5 minutes",
+            ));
+        }
+
+        // Validate hops
+        if self.max_hops == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum hops must be greater than 0",
+            ));
+        }
+        if self.max_hops > 20 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum hops cannot exceed 20 to prevent infinite loops",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 impl EnterpriseGossipConfig {
     /// Create a new builder with default base configuration
     pub fn builder() -> Self {
@@ -180,6 +253,64 @@ impl EnterpriseGossipConfig {
 
         let adaptive_interval_ms = (base_interval_ms + latency_factor + size_factor).min(300_000); // Max 5 minutes
         Duration::from_millis(adaptive_interval_ms)
+    }
+
+    /// Validate the enterprise gossip configuration
+    pub fn validate(&self) -> Result<(), crate::error::SynapseError> {
+        // Validate base configuration first
+        self.base.validate()?;
+
+        // Validate max fanout
+        if self.max_fanout == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum fanout must be greater than 0",
+            ));
+        }
+        if self.max_fanout > 1000 {
+            return Err(crate::error::SynapseError::config(
+                "Maximum fanout cannot exceed 1000 for network efficiency",
+            ));
+        }
+        if self.max_fanout < self.base.fanout {
+            return Err(crate::error::SynapseError::config(
+                "Maximum fanout cannot be less than base fanout",
+            ));
+        }
+
+        // Validate batch size
+        if self.batch_size == 0 {
+            return Err(crate::error::SynapseError::config(
+                "Batch size must be greater than 0",
+            ));
+        }
+        if self.batch_size > 1000 {
+            return Err(crate::error::SynapseError::config(
+                "Batch size cannot exceed 1000 for memory efficiency",
+            ));
+        }
+
+        // Validate target delivery probability
+        if self.target_delivery_probability < 0.0 || self.target_delivery_probability > 1.0 {
+            return Err(crate::error::SynapseError::config(
+                "Target delivery probability must be between 0.0 and 1.0",
+            ));
+        }
+
+        // Validate bandwidth limit if set
+        if let Some(bandwidth) = self.max_bandwidth_per_sec {
+            if bandwidth == 0 {
+                return Err(crate::error::SynapseError::config(
+                    "Bandwidth limit must be greater than 0 if specified",
+                ));
+            }
+            if bandwidth < 1024 {
+                return Err(crate::error::SynapseError::config(
+                    "Bandwidth limit cannot be less than 1KB/sec",
+                ));
+            }
+        }
+
+        Ok(())
     }
 }
 

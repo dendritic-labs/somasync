@@ -8,12 +8,14 @@ async fn test_node_creation_and_basic_setup() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("test-node-1".to_string())
         .with_bind_address("127.0.0.1:17001".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("test-node-2".to_string())
         .with_bind_address("127.0.0.1:17002".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Verify node IDs are set correctly
     assert_eq!(node1.node_id(), "test-node-1");
@@ -30,12 +32,14 @@ async fn test_peer_management() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("peer-test-1".to_string())
         .with_bind_address("127.0.0.1:17003".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("peer-test-2".to_string())
         .with_bind_address("127.0.0.1:17004".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Add peers to each other
     let peer2 = Peer::new(
@@ -147,12 +151,14 @@ async fn test_direct_message_passing() {
     let (mut node1, _msg_rx1, mut event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("sender-node".to_string())
         .with_bind_address("127.0.0.1:17005".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (mut node2, mut msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("receiver-node".to_string())
         .with_bind_address("127.0.0.1:17006".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Set up peer relationships
     let peer2 = Peer::new(
@@ -229,17 +235,20 @@ async fn test_three_node_gossip_propagation() {
     let (mut node_a, mut msg_rx_a, mut event_rx_a) = SynapseNodeBuilder::new()
         .with_node_id("node-a".to_string())
         .with_bind_address("127.0.0.1:17007".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (mut node_b, mut msg_rx_b, _event_rx_b) = SynapseNodeBuilder::new()
         .with_node_id("node-b".to_string())
         .with_bind_address("127.0.0.1:17008".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (mut node_c, mut msg_rx_c, _event_rx_c) = SynapseNodeBuilder::new()
         .with_node_id("node-c".to_string())
         .with_bind_address("127.0.0.1:17009".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Create full mesh connections: A->B, B->C, C->A
     node_a
@@ -381,12 +390,14 @@ async fn test_threat_intel_message_flow() {
     let (mut security_node_1, _msg_rx_1, mut event_rx_1) = SynapseNodeBuilder::new()
         .with_node_id("security-detector-1".to_string())
         .with_bind_address("127.0.0.1:17010".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (mut security_node_2, mut msg_rx_2, _event_rx_2) = SynapseNodeBuilder::new()
         .with_node_id("security-detector-2".to_string())
         .with_bind_address("127.0.0.1:17011".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Connect security nodes
     security_node_1
@@ -496,17 +507,20 @@ async fn test_message_deduplication() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("dedup-node-1".to_string())
         .with_bind_address("127.0.0.1:17020".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("dedup-node-2".to_string())
         .with_bind_address("127.0.0.1:17021".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node3, _msg_rx3, _event_rx3) = SynapseNodeBuilder::new()
         .with_node_id("dedup-node-3".to_string())
         .with_bind_address("127.0.0.1:17022".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Set up mesh topology
     let peer1 = Peer::new(
@@ -555,22 +569,26 @@ async fn test_network_partition_and_healing() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("partition-node-1".to_string())
         .with_bind_address("127.0.0.1:17025".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("partition-node-2".to_string())
         .with_bind_address("127.0.0.1:17026".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node3, _msg_rx3, _event_rx3) = SynapseNodeBuilder::new()
         .with_node_id("partition-node-3".to_string())
         .with_bind_address("127.0.0.1:17027".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node4, _msg_rx4, _event_rx4) = SynapseNodeBuilder::new()
         .with_node_id("partition-node-4".to_string())
         .with_bind_address("127.0.0.1:17028".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Initial full mesh
     let _peer1 = Peer::new(
@@ -648,7 +666,8 @@ async fn test_large_network_convergence() {
         let (node, _msg_rx, _event_rx) = SynapseNodeBuilder::new()
             .with_node_id(format!("conv-node-{}", i))
             .with_bind_address(format!("127.0.0.1:{}", 17030 + i).parse().unwrap())
-            .build();
+            .build()
+            .unwrap();
 
         nodes.push(node);
         _event_receivers.push(_event_rx);
@@ -693,12 +712,14 @@ async fn test_byzantine_fault_tolerance() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("byzantine-node-1".to_string())
         .with_bind_address("127.0.0.1:17040".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (_node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("byzantine-node-2".to_string())
         .with_bind_address("127.0.0.1:17041".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let peer2 = Peer::new(
         "byzantine-node-2".to_string(),
@@ -745,12 +766,14 @@ async fn test_message_ttl_expiration() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("ttl-node-1".to_string())
         .with_bind_address("127.0.0.1:17050".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (_node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("ttl-node-2".to_string())
         .with_bind_address("127.0.0.1:17051".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let peer2 = Peer::new("ttl-node-2".to_string(), "127.0.0.1:17051".parse().unwrap());
     node1.add_peer(peer2).await.unwrap();
@@ -781,17 +804,20 @@ async fn test_connection_failure_resilience() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("resilient-node-1".to_string())
         .with_bind_address("127.0.0.1:17070".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (_node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("resilient-node-2".to_string())
         .with_bind_address("127.0.0.1:17071".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (_node3, _msg_rx3, _event_rx3) = SynapseNodeBuilder::new()
         .with_node_id("resilient-node-3".to_string())
         .with_bind_address("127.0.0.1:17072".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Add valid peer
     let peer2 = Peer::new(
@@ -831,17 +857,20 @@ async fn test_message_ordering_and_causality() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("order-node-1".to_string())
         .with_bind_address("127.0.0.1:17080".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("order-node-2".to_string())
         .with_bind_address("127.0.0.1:17081".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (_node3, _msg_rx3, _event_rx3) = SynapseNodeBuilder::new()
         .with_node_id("order-node-3".to_string())
         .with_bind_address("127.0.0.1:17082".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     // Set up linear topology: node1 -> node2 -> node3
     let peer2 = Peer::new(
@@ -879,17 +908,20 @@ async fn test_gossip_performance_under_load() {
     let (node1, _msg_rx1, _event_rx1) = SynapseNodeBuilder::new()
         .with_node_id("perf-node-1".to_string())
         .with_bind_address("127.0.0.1:17060".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node2, _msg_rx2, _event_rx2) = SynapseNodeBuilder::new()
         .with_node_id("perf-node-2".to_string())
         .with_bind_address("127.0.0.1:17061".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let (node3, _msg_rx3, _event_rx3) = SynapseNodeBuilder::new()
         .with_node_id("perf-node-3".to_string())
         .with_bind_address("127.0.0.1:17062".parse().unwrap())
-        .build();
+        .build()
+        .unwrap();
 
     let peer1 = Peer::new(
         "perf-node-1".to_string(),
