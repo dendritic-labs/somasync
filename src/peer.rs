@@ -9,9 +9,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 use crate::error::SynapseError;
+use crate::logging::{CorrelationId, PerformanceTimer, SecurityEvent};
 
 /// Peer connection state
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -322,6 +323,8 @@ pub enum DiscoveryMethod {
 pub struct PeerManager {
     /// Our node identifier
     node_id: String,
+    /// Session correlation ID for tracking operations
+    correlation_id: CorrelationId,
     /// Known peers
     peers: Arc<RwLock<HashMap<String, Peer>>>,
     /// Discovery configuration
@@ -336,6 +339,7 @@ impl PeerManager {
     pub fn new(node_id: String, config: DiscoveryConfig) -> Self {
         Self {
             node_id,
+            correlation_id: CorrelationId::new(),
             peers: Arc::new(RwLock::new(HashMap::new())),
             config,
             quality_cache: Arc::new(RwLock::new(HashMap::new())),
@@ -343,7 +347,21 @@ impl PeerManager {
     }
 
     /// Add a peer to the manager
+    #[instrument(
+        name = "add_peer",
+        skip(self, peer),
+        fields(
+            node_id = %self.node_id,
+            correlation_id = %self.correlation_id.short(),
+            peer_id = %peer.id,
+            peer_address = %peer.address
+        )
+    )]
     pub async fn add_peer(&self, peer: Peer) -> Result<(), SynapseError> {
+        let timer = PerformanceTimer::new("peer_add")
+            .with_metadata("node_id", &self.node_id)
+            .with_metadata("peer_id", &peer.id);
+
         let mut peers = self.peers.write().await;
 
         // Don't add ourselves
@@ -360,7 +378,28 @@ impl PeerManager {
         let peer_id = peer.id.clone();
         peers.insert(peer_id.clone(), peer);
 
-        info!("Added peer {} to peer manager", peer_id);
+        info!(
+            correlation_id = %self.correlation_id.short(),
+            node_id = %self.node_id,
+            peer_id = %peer_id,
+            peer_count = peers.len(),
+            "Added peer to peer manager"
+        );
+
+        // Log security event for peer addition
+        crate::security_event!(
+            SecurityEvent::PeerValidation {
+                peer_id: peer_id.clone(),
+                success: true,
+                reason: None,
+            },
+            self.correlation_id
+        );
+
+        // Log performance metric
+        let metrics = timer.finish();
+        crate::performance_metric!(metrics, self.correlation_id);
+
         Ok(())
     }
 
@@ -452,8 +491,28 @@ impl PeerManager {
     }
 
     /// Start peer discovery
+    #[instrument(
+        name = "start_discovery",
+        skip(self),
+        fields(
+            node_id = %self.node_id,
+            correlation_id = %self.correlation_id.short(),
+            max_peers = self.config.max_peers,
+            discovery_methods = ?self.config.methods
+        )
+    )]
     pub async fn start_discovery(&self) -> Result<(), SynapseError> {
-        info!("Starting peer discovery for node {}", self.node_id);
+        let timer = PerformanceTimer::new("peer_discovery_start")
+            .with_metadata("node_id", &self.node_id)
+            .with_metadata("max_peers", self.config.max_peers.to_string());
+
+        info!(
+            correlation_id = %self.correlation_id.short(),
+            node_id = %self.node_id,
+            max_peers = self.config.max_peers,
+            discovery_methods = ?self.config.methods,
+            "Starting peer discovery"
+        );
 
         // Bootstrap from known peers
         if self.config.methods.contains(&DiscoveryMethod::Bootstrap) {
@@ -465,6 +524,10 @@ impl PeerManager {
         let cleanup_task = async { self.start_cleanup_timer().await };
 
         tokio::try_join!(discovery_task, cleanup_task)?;
+
+        // Log performance metric
+        let metrics = timer.finish();
+        crate::performance_metric!(metrics, self.correlation_id);
 
         Ok(())
     }
