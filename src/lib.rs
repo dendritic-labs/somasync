@@ -176,9 +176,94 @@
 //!     Ok(())
 //! }
 //! ```
+//!
+//! ### Production Logging and Monitoring
+//!
+//! ```rust,no_run
+//! use somasync::{
+//!     SynapseNodeBuilder, MessageType, CorrelationId,
+//!     init_logging, production_config, SecurityEvent
+//! };
+//! use tracing::{info, warn};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Initialize production logging with JSON output
+//!     let log_config = production_config();
+//!     init_logging(&log_config)?;
+//!
+//!     // Create correlation ID for this session
+//!     let correlation_id = CorrelationId::new();
+//!     
+//!     info!(
+//!         correlation_id = %correlation_id.short(),
+//!         environment = "production",
+//!         "Starting SomaSync threat intelligence node"
+//!     );
+//!
+//!     let (mut node, mut message_rx, mut event_rx) = SynapseNodeBuilder::new()
+//!         .with_node_id("prod-intel-node".to_string())
+//!         .with_bind_address("0.0.0.0:8080".parse()?)
+//!         .build()?;
+//!
+//!     // Start node (automatically logs with correlation ID and performance metrics)
+//!     node.start().await?;
+//!
+//!     info!(
+//!         correlation_id = %correlation_id.short(),
+//!         node_id = "prod-intel-node",
+//!         "Node started successfully with structured logging"
+//!     );
+//!
+//!     // Handle incoming messages with structured logging
+//!     let correlation_id_clone = correlation_id.clone();
+//!     tokio::spawn(async move {
+//!         while let Some(message) = message_rx.recv().await {
+//!             info!(
+//!                 correlation_id = %correlation_id_clone.short(),
+//!                 message_id = %message.id,
+//!                 message_type = ?message.message_type,
+//!                 source = %message.source,
+//!                 "Received threat intelligence message"
+//!             );
+//!
+//!             // Log security event for message processing
+//!             warn!(
+//!                 target: "somasync::security",
+//!                 correlation_id = %correlation_id_clone.short(),
+//!                 event = ?SecurityEvent::SignatureVerification {
+//!                     message_id: message.id.to_string(),
+//!                     node_id: "prod-intel-node".to_string(),
+//!                     success: message.signature.is_some(),
+//!                     algorithm: "ed25519".to_string(),
+//!                 },
+//!                 "Message signature verification completed"
+//!             );
+//!         }
+//!     });
+//!
+//!     // Broadcast threat intelligence with automatic logging
+//!     let threat_alert = MessageType::Alert {
+//!         level: "high".to_string(),
+//!         message: "Suspicious network activity detected".to_string(),
+//!         details: None,
+//!     };
+//!
+//!     // This will automatically log performance metrics and security events
+//!     node.broadcast_message(threat_alert).await?;
+//!
+//!     info!(
+//!         correlation_id = %correlation_id.short(),
+//!         "Production logging demonstration completed"
+//!     );
+//!
+//!     Ok(())
+//! }
+//! ```
 
 pub mod error;
 pub mod gossip;
+pub mod logging;
 pub mod mesh;
 pub mod message;
 pub mod node;
@@ -187,6 +272,10 @@ pub mod peer;
 // Re-export main types for convenience
 pub use error::SynapseError;
 pub use gossip::{EnterpriseGossipConfig, GossipConfig, GossipProtocol, GossipStats, NetworkStats};
+pub use logging::{
+    development_config, init_logging, production_config, CorrelationId, LogConfig,
+    PerformanceMetrics, PerformanceTimer, SecurityEvent, SpanExt,
+};
 pub use mesh::{MeshConfig, MeshNetwork, MeshStats, NetworkTopology, Route};
 pub use message::{priority, ttl, Message, MessageBatch, MessageEnvelope, MessageType};
 pub use node::{SynapseConfig, SynapseEvent, SynapseNode, SynapseNodeBuilder, SynapseStats};

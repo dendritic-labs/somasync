@@ -7,11 +7,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{error, info, warn};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::error::SynapseError;
 use crate::gossip::{GossipConfig, GossipProtocol, GossipStats};
+use crate::logging::{CorrelationId, PerformanceTimer, SecurityEvent};
 use crate::mesh::{MeshConfig, MeshNetwork, MeshStats};
 use crate::message::{Message, MessageType};
 use crate::peer::{DiscoveryConfig, Peer, PeerManager, PeerStats};
@@ -164,6 +165,8 @@ pub struct SynapseNode {
     config: SynapseConfig,
     /// Unique node identifier
     node_id: String,
+    /// Session correlation ID for tracking operations
+    correlation_id: CorrelationId,
     /// Peer manager
     peer_manager: Arc<PeerManager>,
     /// Gossip protocol
@@ -229,6 +232,7 @@ impl SynapseNode {
         let node = Self {
             config,
             node_id,
+            correlation_id: CorrelationId::new(),
             peer_manager,
             gossip: Arc::new(RwLock::new(None)),
             mesh: Arc::new(RwLock::new(None)),
@@ -243,8 +247,37 @@ impl SynapseNode {
 
     /// Starts all node components: gossip protocol, mesh networking, and peer discovery.
     /// Must be called before the node can participate in the network.
+    #[instrument(
+        name = "node_start",
+        skip(self),
+        fields(
+            node_id = %self.node_id,
+            correlation_id = %self.correlation_id.short(),
+            bind_address = %self.config.bind_address
+        )
+    )]
     pub async fn start(&mut self) -> Result<(), SynapseError> {
-        info!("Starting SomaSync node {}", self.node_id);
+        let timer = PerformanceTimer::new("node_startup")
+            .with_metadata("node_id", &self.node_id)
+            .with_metadata("bind_address", self.config.bind_address.to_string());
+
+        info!(
+            correlation_id = %self.correlation_id.short(),
+            node_id = %self.node_id,
+            bind_address = %self.config.bind_address,
+            "Starting SomaSync node"
+        );
+
+        // Log security event for node startup
+        crate::security_event!(
+            SecurityEvent::ConfigChange {
+                component: "node".to_string(),
+                old_value: None,
+                new_value: format!("started on {}", self.config.bind_address),
+                changed_by: self.node_id.clone(),
+            },
+            self.correlation_id
+        );
 
         // Emit startup event
         self.emit_event(SynapseEvent::NodeStarted {
@@ -329,6 +362,10 @@ impl SynapseNode {
         })
         .await;
 
+        // Log startup completion performance metric
+        let metrics = timer.finish();
+        crate::performance_metric!(metrics, self.correlation_id);
+
         Ok(())
     }
 
@@ -397,11 +434,32 @@ impl SynapseNode {
 
     /// Broadcasts a message to all connected peers using the gossip protocol.
     /// The message will propagate through the network with epidemic dissemination.
+    #[instrument(
+        name = "broadcast_message",
+        skip(self, message_type),
+        fields(
+            node_id = %self.node_id,
+            correlation_id = %self.correlation_id.short(),
+            message_type = ?message_type
+        )
+    )]
     pub async fn broadcast_message(&self, message_type: MessageType) -> Result<(), SynapseError> {
+        let timer = PerformanceTimer::new("message_broadcast")
+            .with_metadata("node_id", &self.node_id)
+            .with_metadata("message_type", format!("{:?}", message_type));
+
         let message = Message::new(message_type, self.node_id.clone());
+        let message_id = message.id;
 
         if let Some(gossip) = self.gossip.read().await.as_ref() {
             gossip.gossip_message(message).await?;
+
+            info!(
+                correlation_id = %self.correlation_id.short(),
+                node_id = %self.node_id,
+                message_id = %message_id,
+                "Message broadcast successfully"
+            );
         }
 
         // Update statistics
@@ -409,6 +467,10 @@ impl SynapseNode {
             let mut stats = self.stats.write().await;
             stats.messages_sent += 1;
         }
+
+        // Log performance metric
+        let metrics = timer.finish();
+        crate::performance_metric!(metrics, self.correlation_id);
 
         Ok(())
     }
