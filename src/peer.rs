@@ -58,7 +58,6 @@ pub struct Peer {
 }
 
 impl Peer {
-    /// Create a new peer
     pub fn new(id: String, address: SocketAddr) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -80,19 +79,16 @@ impl Peer {
         }
     }
 
-    /// Create peer with metadata
     pub fn with_metadata(mut self, metadata: HashMap<String, String>) -> Self {
         self.metadata = metadata;
         self
     }
 
-    /// Create peer with version
     pub fn with_version(mut self, version: String) -> Self {
         self.version = Some(version);
         self
     }
 
-    /// Add supported protocol
     pub fn add_protocol(mut self, protocol: String) -> Self {
         self.protocols.insert(protocol);
         self
@@ -150,7 +146,7 @@ impl Peer {
         self.bandwidth_estimate = Some(bandwidth_bps);
     }
 
-    /// Get peer quality score (0-100)
+    /// Calculates a quality score (0-100) based on trust, latency, and failure history
     pub fn quality_score(&self) -> u8 {
         let mut score = self.trust_score;
 

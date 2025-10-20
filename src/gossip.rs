@@ -214,7 +214,8 @@ impl EnterpriseGossipConfig {
         self
     }
 
-    /// Create config optimized for enterprise threat intel sharing
+    /// Creates an enterprise configuration optimized for threat intelligence sharing
+    /// with high reliability, bandwidth management, and smart routing capabilities
     pub fn for_threat_intel() -> Self {
         Self::builder()
             .with_adaptive_fanout(15)

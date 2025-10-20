@@ -1,4 +1,4 @@
-//! Main Synapse node implementation
+//! Main SomaSync node implementation
 //!
 //! This module provides the SynapseNode which coordinates all the distributed
 //! networking components and provides a high-level API for mesh communication.
@@ -241,9 +241,10 @@ impl SynapseNode {
         (node, message_rx, event_rx)
     }
 
-    /// Start the Synapse node
+    /// Starts all node components: gossip protocol, mesh networking, and peer discovery.
+    /// Must be called before the node can participate in the network.
     pub async fn start(&mut self) -> Result<(), SynapseError> {
-        info!("Starting Synapse node {}", self.node_id);
+        info!("Starting SomaSync node {}", self.node_id);
 
         // Emit startup event
         self.emit_event(SynapseEvent::NodeStarted {
@@ -394,7 +395,8 @@ impl SynapseNode {
         Ok(())
     }
 
-    /// Broadcast a message to all peers
+    /// Broadcasts a message to all connected peers using the gossip protocol.
+    /// The message will propagate through the network with epidemic dissemination.
     pub async fn broadcast_message(&self, message_type: MessageType) -> Result<(), SynapseError> {
         let message = Message::new(message_type, self.node_id.clone());
 
@@ -457,22 +459,19 @@ impl SynapseNode {
         stats.clone()
     }
 
-    /// Get node ID
     pub fn node_id(&self) -> &str {
         &self.node_id
     }
 
-    /// Get node configuration
     pub fn config(&self) -> &SynapseConfig {
         &self.config
     }
 
-    /// Get healthy peers
     pub async fn get_healthy_peers(&self) -> Vec<Peer> {
         self.peer_manager.get_healthy_peers().await
     }
 
-    /// Get best peers for communication
+    /// Returns the highest quality peers for efficient communication
     pub async fn get_best_peers(&self, count: usize) -> Vec<Peer> {
         self.peer_manager.get_best_peers(count).await
     }
@@ -541,31 +540,26 @@ impl SynapseNodeBuilder {
         }
     }
 
-    /// Set node ID
     pub fn with_node_id(mut self, node_id: String) -> Self {
         self.config.node_id = Some(node_id);
         self
     }
 
-    /// Set bind address
     pub fn with_bind_address(mut self, address: SocketAddr) -> Self {
         self.config.bind_address = address;
         self
     }
 
-    /// Set gossip configuration
     pub fn with_gossip_config(mut self, gossip: GossipConfig) -> Self {
         self.config.gossip = gossip;
         self
     }
 
-    /// Set mesh configuration
     pub fn with_mesh_config(mut self, mesh: MeshConfig) -> Self {
         self.config.mesh = mesh;
         self
     }
 
-    /// Set discovery configuration
     pub fn with_discovery_config(mut self, discovery: DiscoveryConfig) -> Self {
         self.config.discovery = discovery;
         self
@@ -577,19 +571,18 @@ impl SynapseNodeBuilder {
         self
     }
 
-    /// Enable/disable auto discovery
     pub fn with_auto_discovery(mut self, enabled: bool) -> Self {
         self.config.auto_discovery = enabled;
         self
     }
 
-    /// Set message buffer size
     pub fn with_message_buffer_size(mut self, size: usize) -> Self {
         self.config.message_buffer_size = size;
         self
     }
 
-    /// Build the Synapse node
+    /// Creates a new SynapseNode with the configured settings, returning the node and its
+    /// message/event receivers. Validates configuration before creation.
     pub fn build(
         self,
     ) -> Result<

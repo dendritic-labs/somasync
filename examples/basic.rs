@@ -1,4 +1,4 @@
-//! Basic example showing how to use the Synapse library
+//! Basic example showing how to use the SomaSync library
 
 use somasync::{Peer, SynapseNodeBuilder};
 use tokio::time::{sleep, Duration};
